@@ -1,0 +1,16 @@
+version: "3.9"
+services:
+  db:
+    image: postgres:16
+    container_name: kopama_db
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: kopama
+      POSTGRES_PASSWORD: kopama_pass
+      POSTGRES_DB: kopama
+    volumes:
+      - kopama_pgdata:/var/lib/postgresql/data
+
+volumes:
+  kopama_pgdata:
