@@ -1,6 +1,5 @@
 generator client {
-  provider = "prisma-client"
-  output   = "../src/generated/prisma"
+  provider = "prisma-client-js"
 }
 
 datasource db {
@@ -46,16 +45,16 @@ model User {
 }
 
 model CourseCategory {
-  id          String @id @default(cuid())
-  code        String @unique
+  id          String       @id @default(cuid())
+  code        String       @unique
   name        String
-  priceGrosze Int
   enrollments Enrollment[]
+  offerItems  OfferItem[]
 }
 
 model Enrollment {
-  id        String           @id @default(cuid())
-  status    EnrollmentStatus @default(DRAFT)
+  id     String           @id @default(cuid())
+  status EnrollmentStatus @default(DRAFT)
 
   firstName String
   lastName  String
@@ -75,8 +74,8 @@ model Enrollment {
   courseCategoryId String
   courseCategory   CourseCategory @relation(fields: [courseCategoryId], references: [id])
 
-  payment   PaymentTransaction?
-  contract  ContractDocument?
+  payment  PaymentTransaction?
+  contract ContractDocument?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -86,9 +85,9 @@ model Enrollment {
 }
 
 model PaymentTransaction {
-  id           String        @id @default(cuid())
-  enrollmentId String        @unique
-  enrollment   Enrollment    @relation(fields: [enrollmentId], references: [id])
+  id           String     @id @default(cuid())
+  enrollmentId String     @unique
+  enrollment   Enrollment @relation(fields: [enrollmentId], references: [id])
 
   status       PaymentStatus @default(REGISTERED)
   amountGrosze Int
@@ -107,9 +106,9 @@ model PaymentTransaction {
 }
 
 model ContractDocument {
-  id           String         @id @default(cuid())
-  enrollmentId String         @unique
-  enrollment   Enrollment     @relation(fields: [enrollmentId], references: [id])
+  id           String     @id @default(cuid())
+  enrollmentId String     @unique
+  enrollment   Enrollment @relation(fields: [enrollmentId], references: [id])
 
   status      ContractStatus @default(NOT_GENERATED)
   templateVer String         @default("v1")
@@ -120,4 +119,60 @@ model ContractDocument {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+enum OfferType {
+  COURSE
+  EXTRA_HOUR
+  EXAM_CAR
+  TRAINING_PACKAGE
+  OTHER
+}
+
+enum OfferUnit {
+  PACKAGE
+  HOUR
+  SERVICE
+}
+
+enum CustomerType {
+  PUBLIC
+  KOPAMA_STUDENT
+}
+
+model OfferItem {
+  id       String    @id @default(cuid())
+  code     String    @unique
+  name     String
+  type     OfferType
+  unit     OfferUnit
+  isActive Boolean   @default(true)
+
+  // opcjonalnie: jeśli usługa dotyczy konkretnej kategorii
+  courseCategoryId String?
+  courseCategory   CourseCategory? @relation(fields: [courseCategoryId], references: [id])
+
+  priceRules PriceRule[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model PriceRule {
+  id          String    @id @default(cuid())
+  offerItemId String
+  offerItem   OfferItem @relation(fields: [offerItemId], references: [id])
+
+  customerType CustomerType
+  priceZloty   Decimal      @db.Decimal(10, 2)
+  currency     String       @default("PLN")
+
+  validFrom DateTime?
+  validTo   DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([offerItemId, customerType, validFrom, validTo])
+  @@index([offerItemId])
 }
