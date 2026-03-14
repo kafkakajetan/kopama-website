@@ -67,12 +67,34 @@ model Enrollment {
   city         String
   postalCode   String
 
+    birthDate      DateTime
+    courseMode     CourseMode
+    courseStartDate DateTime
+
+    isMinorAtPurchase Boolean @default(false)
+
+    guardianPesel        String?
+    guardianFirstName    String?
+    guardianLastName     String?
+    guardianPhone        String?
+    guardianAddressLine1 String?
+    guardianAddressLine2 String?
+    guardianCity         String?
+    guardianPostalCode   String?
+
+    guardianSameAddress  Boolean? @default(false)
+
   acceptedTermsAt   DateTime
+  acceptedSalesTermsAt      DateTime?
+  acceptedSalesTermsVersion String?
   acceptedPrivacyAt DateTime
   acceptedIp        String?
 
   courseCategoryId String
   courseCategory   CourseCategory @relation(fields: [courseCategoryId], references: [id])
+
+   offerItemId String
+   offerItem   OfferItem @relation(fields: [offerItemId], references: [id])
 
   payment  PaymentTransaction?
   contract ContractDocument?
@@ -140,6 +162,11 @@ enum CustomerType {
   KOPAMA_STUDENT
 }
 
+enum CourseMode {
+  STATIONARY
+  ELEARNING
+}
+
 model OfferItem {
   id       String    @id @default(cuid())
   code     String    @unique
@@ -151,6 +178,8 @@ model OfferItem {
   // opcjonalnie: jeśli usługa dotyczy konkretnej kategorii
   courseCategoryId String?
   courseCategory   CourseCategory? @relation(fields: [courseCategoryId], references: [id])
+
+  enrollments Enrollment[]
 
   priceRules PriceRule[]
 

@@ -1,14 +1,31 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import Link from 'next/link';
+import { useEffect, useMemo, useState } from 'react';
 
-type CourseCategory = {
+type PriceRule = {
+    customerType: 'PUBLIC' | 'KOPAMA_STUDENT';
+    priceZloty: string;
+    currency: string;
+};
+
+type CourseCategory = { id: string; code: string; name: string };
+
+type OfferItem = {
     id: string;
     code: string;
     name: string;
+    type: 'COURSE' | 'EXTRA_HOUR' | 'EXAM_CAR' | 'TRAINING_PACKAGE' | 'OTHER';
+    unit: 'PACKAGE' | 'HOUR' | 'SERVICE';
+    isActive: boolean;
+    courseCategory?: CourseCategory | null;
+    priceRules: PriceRule[];
 };
 
 type CreateEnrollmentPayload = {
+    offerItemCode: string;
+    courseCategoryId: string;
+
     firstName: string;
     lastName: string;
     email: string;
@@ -18,20 +35,119 @@ type CreateEnrollmentPayload = {
     addressLine2?: string;
     city: string;
     postalCode: string;
-    courseCategoryId: string;
+
+    birthDate: string;
+    courseMode: 'STATIONARY' | 'ELEARNING';
+    courseStartDate: string;
+
+    guardianSameAddress: boolean;
+
+    guardianPesel: string;
+    guardianFirstName: string;
+    guardianLastName: string;
+    guardianPhone: string;
+    guardianAddressLine1: string;
+    guardianAddressLine2?: string;
+    guardianCity: string;
+    guardianPostalCode: string;
+
     acceptedTerms: boolean;
     acceptedPrivacy: boolean;
+    acceptedSalesTerms: boolean;
 };
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
+function formatPLN(priceZloty: string): string {
+    const n = Number.parseFloat(priceZloty);
+    if (Number.isNaN(n)) return `${priceZloty} PLN`;
+    return new Intl.NumberFormat('pl-PL', { style: 'currency', currency: 'PLN' }).format(n);
+}
+
+function digitsOnly(value: string): string {
+    return value.replace(/\D/g, '');
+}
+
+function addMonths(date: Date, months: number): Date {
+    const d = new Date(date);
+    const day = d.getDate();
+    d.setMonth(d.getMonth() + months);
+    if (d.getDate() !== day) d.setDate(0);
+    return d;
+}
+
+function toDateInputValue(d: Date): string {
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
+}
+
+function isMinorOnDate(birth: Date, on: Date): boolean {
+    const adultAt = addMonths(birth, 18 * 12);
+    return on.getTime() < adultAt.getTime();
+}
+
+function formatPostalCode(value: string): string {
+    const d = digitsOnly(value).slice(0, 5);
+    if (d.length <= 2) return d;
+    return `${d.slice(0, 2)}-${d.slice(2)}`;
+}
+
+function sanitizeCity(value: string): string {
+    return value
+        .replace(/[^A-Za-zĄąĆćĘęŁłŃńÓóŚśŹźŻż \-]/g, '')
+        .replace(/\s{2,}/g, ' ')
+        .trimStart();
+}
+
+function formatPhonePl(value: string): string {
+    const d = digitsOnly(value).slice(0, 9);
+    return `+48${d}`;
+}
+
+function getPublicPrice(offer: OfferItem): string | null {
+    const rule = offer.priceRules.find((r) => r.customerType === 'PUBLIC');
+    return rule?.priceZloty ?? null;
+}
+
+function sanitizeEmail(value: string): string {
+    return value.trim().toLowerCase().replace(/\s+/g, '');
+}
+
+function Stepper({ current }: { current: 1 | 2 | 3 | 4 }) {
+    const steps: Array<1 | 2 | 3 | 4> = [1, 2, 3, 4];
+    return (
+        <ol className="kpProgress" aria-label="Postęp">
+            {steps.map((s) => {
+                const cls = s < current ? 'kpStep done' : s === current ? 'kpStep active' : 'kpStep';
+                return (
+                    <li key={s} className={cls}>
+                        <span className="kpDot">{s}</span>
+                    </li>
+                );
+            })}
+        </ol>
+    );
+}
+
 export default function ZapisPage() {
-    const [categories, setCategories] = useState<CourseCategory[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string>('');
-    const [success, setSuccess] = useState<string>('');
+    const [enrollmentId, setEnrollmentId] = useState<string>('');
+
+    const [offers, setOffers] = useState<OfferItem[]>([]);
+    const courseOffers = useMemo(
+        () => offers.filter((o) => o.isActive && o.type === 'COURSE'),
+        [offers],
+    );
+
+    const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
 
     const [form, setForm] = useState<CreateEnrollmentPayload>({
+        offerItemCode: '',
+        courseCategoryId: '',
+
         firstName: '',
         lastName: '',
         email: '',
@@ -41,54 +157,149 @@ export default function ZapisPage() {
         addressLine2: '',
         city: '',
         postalCode: '',
-        courseCategoryId: '',
+
+        birthDate: '',
+        courseMode: 'STATIONARY',
+        courseStartDate: '',
+
+        guardianSameAddress: false,
+        guardianPesel: '',
+        guardianFirstName: '',
+        guardianLastName: '',
+        guardianPhone: '',
+        guardianAddressLine1: '',
+        guardianAddressLine2: '',
+        guardianCity: '',
+        guardianPostalCode: '',
+
         acceptedTerms: false,
         acceptedPrivacy: false,
+        acceptedSalesTerms: false,
     });
+
+    const birth = form.birthDate ? new Date(form.birthDate) : null;
+    const minor = birth && !Number.isNaN(birth.getTime()) ? isMinorOnDate(birth, new Date()) : false;
+    const minCourseStart = birth ? addMonths(birth, 16 * 12 + 9) : null;
+    const minCourseStartStr = minCourseStart ? toDateInputValue(minCourseStart) : '';
 
     useEffect(() => {
         const load = async () => {
             try {
                 setError('');
-                setSuccess('');
-                if (!API_URL) throw new Error('Brak NEXT_PUBLIC_API_URL w apps/web/.env.local');
+                if (!API_URL) throw new Error('Brak NEXT_PUBLIC_API_URL w apps/web/.env.local')
 
-                const res = await fetch(`${API_URL}/course-categories`, { cache: 'no-store' });
-                if (!res.ok) throw new Error(`Nie udało się pobrać kategorii (HTTP ${res.status})`);
+                const res = await fetch(`${API_URL}/offers`, { cache: 'no-store' });
+                if (!res.ok) throw new Error(`Nie udało się pobrać oferty (HTTP ${res.status})`);
 
-                const data = (await res.json()) as CourseCategory[];
-                setCategories(data);
+                const data = (await res.json()) as OfferItem[];
+                setOffers(data);
 
-                if (data.length && !form.courseCategoryId) {
-                    setForm((p) => ({ ...p, courseCategoryId: data[0].id }));
-                }
+                const firstCourse = data.find((o) => o.isActive && o.type === 'COURSE');
+                if (!firstCourse) throw new Error('Brak aktywnych kursów w ofercie (OfferItem type=COURSE).');
+                if (!firstCourse.courseCategory?.id) throw new Error(`Kurs "${firstCourse.name}" nie ma przypisanej kategorii.`);
+
+                setForm((p) => ({
+                    ...p,
+                    offerItemCode: firstCourse.code,
+                    courseCategoryId: firstCourse.courseCategory!.id,
+                }));
             } catch (e) {
-                setError(e instanceof Error ? e.message : 'Błąd pobierania kategorii');
+                setError(e instanceof Error ? e.message : 'Błąd pobierania danych');
             } finally {
                 setLoading(false);
             }
         };
 
         void load();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
+
+    const selectedOffer = useMemo(
+        () => courseOffers.find((o) => o.code === form.offerItemCode) ?? null,
+        [courseOffers, form.offerItemCode],
+    );
 
     const set = <K extends keyof CreateEnrollmentPayload>(key: K, value: CreateEnrollmentPayload[K]) => {
         setForm((p) => ({ ...p, [key]: value }));
     };
 
-    const onSubmit = async (ev: React.FormEvent) => {
-        ev.preventDefault();
+    const pickOffer = (offer: OfferItem) => {
+        const catId = offer.courseCategory?.id;
+        if (!catId) {
+            setError(`Wybrany kurs "${offer.name}" nie ma przypisanej kategorii.`);
+            return;
+        }
+        setError('');
+        setForm((p) => ({ ...p, offerItemCode: offer.code, courseCategoryId: catId }));
+    };
+
+    const validateStep = (s: 1 | 2 | 3 | 4): string | null => {
+        if (s === 1) {
+            if (!form.offerItemCode) return 'Wybierz kurs.';
+            return null;
+        }
+        if (s === 2) {
+            if (!form.firstName || !form.lastName) return 'Uzupełnij imię i nazwisko.';
+            if (!/^\+48\d{9}$/.test(form.phone)) return 'Telefon musi mieć format +48 i 9 cyfr.';
+            if (!/^\d{11}$/.test(form.pesel)) return 'PESEL musi mieć 11 cyfr.';
+            if (!/^\d{2}-\d{3}$/.test(form.postalCode)) return 'Kod pocztowy musi mieć format 00-000.';
+            if (!/^[A-Za-zĄąĆćĘęŁłŃńÓóŚśŹźŻż \-]{2,}$/.test(form.city)) return 'Nieprawidłowa nazwa miasta.';
+            if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(form.email)) return 'Podaj poprawny adres e-mail.';
+            if (!form.addressLine1 || !form.city || !form.postalCode) return 'Uzupełnij adres.';
+            if (!form.acceptedTerms || !form.acceptedPrivacy) return 'Zaakceptuj regulamin i politykę prywatności.';
+            return null;
+        }
+        if (s === 3) {
+            if (!form.acceptedSalesTerms) return 'Zaakceptuj regulamin sprzedaży.';
+            return null;
+        }
+        return null;
+    };
+
+    const next = () => {
+        const msg = validateStep(step);
+        if (msg) return setError(msg);
+        setError('');
+        setStep((prev) => (prev === 1 ? 2 : prev === 2 ? 3 : 4));
+    };
+
+    const back = () => {
+        setError('');
+        setStep((prev) => (prev === 4 ? 3 : prev === 3 ? 2 : 1));
+    };
+
+    const submit = async () => {
+        console.log('SUBMIT PESEL:', form.pesel, 'len=', form.pesel.length);
+
+        const msg = validateStep(3);
+        if (msg) return setError(msg);
 
         try {
             setError('');
-            setSuccess('');
             if (!API_URL) throw new Error('Brak NEXT_PUBLIC_API_URL w apps/web/.env.local');
+
+            const payload: Record<string, unknown> = {
+                ...form,
+                pesel: digitsOnly(form.pesel).slice(0, 11),
+                email: sanitizeEmail(form.email),
+                postalCode: formatPostalCode(form.postalCode),
+            };
+
+            if (!minor) {
+                delete payload.guardianSameAddress;
+                delete payload.guardianPesel;
+                delete payload.guardianFirstName;
+                delete payload.guardianLastName;
+                delete payload.guardianPhone;
+                delete payload.guardianAddressLine1;
+                delete payload.guardianAddressLine2;
+                delete payload.guardianCity;
+                delete payload.guardianPostalCode;
+            }
 
             const res = await fetch(`${API_URL}/enrollments`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(form),
+                body: JSON.stringify(payload),
             });
 
             if (!res.ok) {
@@ -102,108 +313,415 @@ export default function ZapisPage() {
                 throw new Error(msg);
             }
 
-            setSuccess('Zapis przyjęty. Następny krok: płatność (dodamy w kolejnym etapie).');
+            const created = await res.json();
+            setEnrollmentId(created.id);
+            setStep(4);
         } catch (e) {
             setError(e instanceof Error ? e.message : 'Błąd zapisu');
         }
     };
 
     return (
-        <main style={{ maxWidth: 760, margin: '40px auto', padding: 16 }}>
-            <h1>Zapis na kurs</h1>
-
-            {loading && <p>Ładowanie…</p>}
-            {error && <p style={{ color: 'crimson', whiteSpace: 'pre-wrap' }}>{error}</p>}
-            {success && <p style={{ color: 'green' }}>{success}</p>}
-
-            {!loading && (
-                <form onSubmit={onSubmit} style={{ display: 'grid', gap: 12 }}>
-                    <div style={{ display: 'grid', gap: 6 }}>
-                        <label>Kategoria kursu</label>
-                        <select
-                            value={form.courseCategoryId}
-                            onChange={(e) => set('courseCategoryId', e.target.value)}
-                            required
-                        >
-                            {categories.map((c) => (
-                                <option key={c.id} value={c.id}>
-                                    {c.name} ({c.code})
-                                </option>
-                            ))}
-                        </select>
+        <>
+            <div className="nav">
+                <Link className="brand" href="/start">
+                    <div className="logo">K</div>
+                    <div className="title">
+                        <strong>KopaMa – Panel</strong>
+                        <span>Zapis na kurs</span>
                     </div>
+                </Link>
 
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                        <div style={{ display: 'grid', gap: 6 }}>
-                            <label>Imię</label>
-                            <input value={form.firstName} onChange={(e) => set('firstName', e.target.value)} required />
-                        </div>
-                        <div style={{ display: 'grid', gap: 6 }}>
-                            <label>Nazwisko</label>
-                            <input value={form.lastName} onChange={(e) => set('lastName', e.target.value)} required />
-                        </div>
+                <div className="nav-actions">
+                    <Link className="pill navy" href="/start">
+                        Wróć
+                    </Link>
+                    <a className="pill beige" href="https://kopama.pl/">
+                        kopama.pl
+                    </a>
+                </div>
+            </div>
+
+            <main className="hero">
+                <section className="shell">
+                    <div className="hero-inner">
+                        <p className="kicker">Zakup kursu online</p>
+                        <h1 className="headline">
+                            Zapis na <span className="accent">kurs</span>
+                        </h1>
+                        <p className="subline">Wypełnij formularz, a następnie przejdź do płatności Przelewy24.</p>
+
+                        {loading ? (
+                            <div className="wizPanel">
+                                <p>Ładowanie…</p>
+                            </div>
+                        ) : (
+                            <div className="wizPanel">
+                                <Stepper current={step} />
+
+                                <div className="wizHeader">
+                                    <h2 className="wizTitle">
+                                        {step === 1 && '1) Wybór kursu'}
+                                        {step === 2 && '2) Dane kursanta'}
+                                        {step === 3 && '3) Podsumowanie'}
+                                        {step === 4 && '4) Płatność'}
+                                    </h2>
+                                    <p className="wizMeta">Krok {step} z 4</p>
+                                </div>
+
+                                {error && <p style={{ color: 'crimson', whiteSpace: 'pre-wrap', marginTop: 0 }}>{error}</p>}
+
+                                {step === 1 && (
+                                    <>
+                                        <p className="wizMeta" style={{ marginTop: 0 }}>
+                                            Wybierz wariant kursu. Cena dotyczy płatności online.
+                                        </p>
+
+                                        <div className="offerGrid">
+                                            {courseOffers.map((o) => {
+                                                const price = getPublicPrice(o);
+                                                const selected = o.code === form.offerItemCode;
+                                                return (
+                                                    <button
+                                                        key={o.id}
+                                                        type="button"
+                                                        className={`offerTile ${selected ? 'selected' : ''}`}
+                                                        onClick={() => pickOffer(o)}
+                                                        aria-pressed={selected}
+                                                    >
+                                                        <p className="offerName">{o.name}</p>
+                                                        <p className="offerPrice">{price ? formatPLN(price) : 'Brak ceny'}</p>
+                                                        <p className="offerHint">Kliknij, aby wybrać</p>
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
+
+                                        <div className="wizActions">
+                                            <div />
+                                            <div className="wizActionsRight">
+                                                <button type="button" className="pill navy" onClick={next}>
+                                                    Dalej
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </>
+                                )}
+
+                                {step === 2 && (
+                                    <>
+                                        <div className="wizGrid2">
+                                            <div>
+                                                <label>Imię</label>
+                                                <input value={form.firstName} onChange={(e) => set('firstName', e.target.value)} />
+                                            </div>
+                                            <div>
+                                                <label>Nazwisko</label>
+                                                <input value={form.lastName} onChange={(e) => set('lastName', e.target.value)} />
+                                            </div>
+                                        </div>
+
+                                        <div className="wizGrid2">
+                                            <div>
+                                                <label>Email</label>
+                                                <input
+                                                    type="email"
+                                                    value={form.email}
+                                                    onChange={(e) => set('email', sanitizeEmail(e.target.value))}
+                                                    autoComplete="email"
+                                                    inputMode="email"
+                                                    placeholder="np. jan.kowalski@example.com"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label>Telefon</label>
+                                                <input
+                                                    value={form.phone.startsWith('+48') ? form.phone.slice(3) : digitsOnly(form.phone).slice(0, 9)}
+                                                    onChange={(e) => set('phone', formatPhonePl(e.target.value))}
+                                                    inputMode="numeric"
+                                                    autoComplete="tel"
+                                                    placeholder="123456789"
+                                                    maxLength={9}
+                                                />
+                                            </div>
+                                        </div>
+                                        <div className="wizGrid2">
+                                            <div>
+                                                <label>Data urodzenia</label>
+                                                <input
+                                                    type="date"
+                                                    value={form.birthDate}
+                                                    onChange={(e) => set('birthDate', e.target.value)}
+                                                    max={toDateInputValue(new Date())}
+                                                />
+                                            </div>
+
+                                            <div>
+                                                <label>Tryb kursu</label>
+                                                <select
+                                                    value={form.courseMode}
+                                                    onChange={(e) => set('courseMode', e.target.value as 'STATIONARY' | 'ELEARNING')}
+                                                >
+                                                    <option value="STATIONARY">Kurs stacjonarny</option>
+                                                    <option value="ELEARNING">Kurs e-learning</option>
+                                                </select>
+                                            </div>
+                                        </div>
+
+                                        <div>
+                                            <label>Termin rozpoczęcia kursu</label>
+                                            <input
+                                                type="date"
+                                                value={form.courseStartDate}
+                                                onChange={(e) => set('courseStartDate', e.target.value)}
+                                                min={minCourseStartStr || undefined}
+                                                disabled={!minCourseStartStr}
+                                            />
+                                        </div>
+                                        <div className="wizGrid2">
+                                            <div>
+                                                <label>PESEL</label>
+                                                <input
+                                                    value={form.pesel}
+                                                    onChange={(e) => set('pesel', digitsOnly(e.target.value).slice(0, 11))}
+                                                    inputMode="numeric"
+                                                    maxLength={11}
+                                                    placeholder="11 cyfr"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label>Kod pocztowy</label>
+                                                <input
+                                                    value={formatPostalCode(form.postalCode)}
+                                                    onChange={(e) => set('postalCode', formatPostalCode(e.target.value))}
+                                                    inputMode="numeric"
+                                                    autoComplete="postal-code"
+                                                    placeholder="00-000"
+                                                    maxLength={6}
+                                                />
+                                            </div>
+                                        </div>
+
+                                        <div>
+                                            <label>Adres (ulica i numer)</label>
+                                            <input value={form.addressLine1} onChange={(e) => set('addressLine1', e.target.value)} />
+                                        </div>
+
+                                        <div>
+                                            <label>Adres cd. (opcjonalnie)</label>
+                                            <input value={form.addressLine2 ?? ''} onChange={(e) => set('addressLine2', e.target.value)} />
+                                        </div>
+
+                                        <div>
+                                            <label>Miasto</label>
+                                            <input
+                                                value={form.city}
+                                                onChange={(e) => set('city', sanitizeCity(e.target.value))}
+                                                autoComplete="address-level2"
+                                                placeholder="np. Warszawa"
+                                            />
+                                        </div>
+
+                                        <div style={{ marginTop: 10 }}>
+                                            <label className="check" style={{ margin: 0 }}>
+                                                <input
+                                                    type="checkbox"
+                                                    checked={form.acceptedTerms}
+                                                    onChange={(e) => set('acceptedTerms', e.target.checked)}
+                                                />
+                                                Akceptuję regulamin
+                                            </label>
+
+                                            <label className="check" style={{ margin: '10px 0 0' }}>
+                                                <input
+                                                    type="checkbox"
+                                                    checked={form.acceptedPrivacy}
+                                                    onChange={(e) => set('acceptedPrivacy', e.target.checked)}
+                                                />
+                                                Akceptuję politykę prywatności
+                                            </label>
+                                        </div>
+                                        {minor && (
+                                            <div style={{ marginTop: 12 }}>
+                                                <p className="wizMeta" style={{ marginTop: 0 }}>
+                                                    Uwaga: osoba niepełnoletnia. Umowa wymaga podpisu opiekuna prawnego.
+                                                </p>
+
+                                                <div className="wizGrid2">
+                                                    <div>
+                                                        <label>PESEL opiekuna</label>
+                                                        <input
+                                                            value={form.guardianPesel}
+                                                            onChange={(e) => set('guardianPesel', digitsOnly(e.target.value).slice(0, 11))}
+                                                            inputMode="numeric"
+                                                            maxLength={11}
+                                                        />
+                                                    </div>
+                                                    <div>
+                                                        <label>Telefon opiekuna</label>
+                                                        <input
+                                                            value={form.guardianPhone.startsWith('+48') ? form.guardianPhone.slice(3) : digitsOnly(form.guardianPhone).slice(0, 9)}
+                                                            onChange={(e) => set('guardianPhone', formatPhonePl(e.target.value))}
+                                                            inputMode="numeric"
+                                                            maxLength={9}
+                                                            placeholder="123456789"
+                                                        />
+                                                    </div>
+                                                </div>
+
+                                                <div className="wizGrid2">
+                                                    <div>
+                                                        <label>Imię opiekuna</label>
+                                                        <input value={form.guardianFirstName} onChange={(e) => set('guardianFirstName', e.target.value)} />
+                                                    </div>
+                                                    <div>
+                                                        <label>Nazwisko opiekuna</label>
+                                                        <input value={form.guardianLastName} onChange={(e) => set('guardianLastName', e.target.value)} />
+                                                    </div>
+                                                </div>
+
+                                                <label className="check" style={{ margin: '10px 0 0' }}>
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={form.guardianSameAddress}
+                                                        onChange={(e) => {
+                                                            const checked = e.target.checked;
+                                                            set('guardianSameAddress', checked);
+                                                            if (checked) {
+                                                                set('guardianAddressLine1', form.addressLine1);
+                                                                set('guardianAddressLine2', form.addressLine2 ?? '');
+                                                                set('guardianCity', form.city);
+                                                                set('guardianPostalCode', form.postalCode);
+                                                            }
+                                                        }}
+                                                    />
+                                                    Dane adresowe opiekuna takie same jak kursanta
+                                                </label>
+
+                                                <div className="wizGrid2" style={{ marginTop: 10 }}>
+                                                    <div>
+                                                        <label>Adres opiekuna (ulica i numer)</label>
+                                                        <input
+                                                            value={form.guardianAddressLine1}
+                                                            onChange={(e) => set('guardianAddressLine1', e.target.value)}
+                                                            disabled={form.guardianSameAddress}
+                                                        />
+                                                    </div>
+                                                    <div>
+                                                        <label>Adres cd. (opcjonalnie)</label>
+                                                        <input
+                                                            value={form.guardianAddressLine2 ?? ''}
+                                                            onChange={(e) => set('guardianAddressLine2', e.target.value)}
+                                                            disabled={form.guardianSameAddress}
+                                                        />
+                                                    </div>
+                                                </div>
+
+                                                <div className="wizGrid2">
+                                                    <div>
+                                                        <label>Miasto opiekuna</label>
+                                                        <input
+                                                            value={form.guardianCity}
+                                                            onChange={(e) => set('guardianCity', sanitizeCity(e.target.value))}
+                                                            disabled={form.guardianSameAddress}
+                                                        />
+                                                    </div>
+                                                    <div>
+                                                        <label>Kod pocztowy opiekuna</label>
+                                                        <input
+                                                            value={formatPostalCode(form.guardianPostalCode)}
+                                                            onChange={(e) => set('guardianPostalCode', formatPostalCode(e.target.value))}
+                                                            inputMode="numeric"
+                                                            maxLength={6}
+                                                            placeholder="00-000"
+                                                            disabled={form.guardianSameAddress}
+                                                        />
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
+                                        <div className="wizActions">
+                                            <button type="button" className="pill beige" onClick={back}>
+                                                Wstecz
+                                            </button>
+                                            <div className="wizActionsRight">
+                                                <button type="button" className="pill navy" onClick={next}>
+                                                    Dalej
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </>
+                                )}
+
+                                {step === 3 && (
+                                    <>
+                                        <p className="wizMeta" style={{ marginTop: 0 }}>
+                                            Sprawdź dane. Przed przejściem do płatności wymagamy akceptacji regulaminu sprzedaży.
+                                        </p>
+
+                                        <div className="wizGrid2">
+                                            <div>
+                                                <p className="wizMeta"><strong>Kurs:</strong> {selectedOffer?.name ?? form.offerItemCode}</p>
+                                                <p className="wizMeta"><strong>Email:</strong> {form.email}</p>
+                                            </div>
+                                            <div>
+                                                <p className="wizMeta"><strong>Imię i nazwisko:</strong> {form.firstName} {form.lastName}</p>
+                                                <p className="wizMeta"><strong>Telefon:</strong> {form.phone}</p>
+                                            </div>
+                                        </div>
+
+                                        <div style={{ marginTop: 10 }}>
+                                            <label className="check" style={{ margin: 0 }}>
+                                                <input
+                                                    type="checkbox"
+                                                    checked={form.acceptedSalesTerms}
+                                                    onChange={(e) => set('acceptedSalesTerms', e.target.checked)}
+                                                />
+                                                Potwierdzam zapoznanie się z regulaminem sprzedaży
+                                            </label>
+                                        </div>
+
+                                        <div className="wizActions">
+                                            <button type="button" className="pill beige" onClick={back}>
+                                                Wstecz
+                                            </button>
+                                            <div className="wizActionsRight">
+                                                <button type="button" className="pill navy" onClick={submit}>
+                                                    Przejdź do płatności
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </>
+                                )}
+
+                                {step === 4 && (
+                                    <>
+                                        <p className="wizMeta" style={{ marginTop: 0 }}>
+                                            Zapis został utworzony. W kolejnym kroku przekierujemy Cię do płatności Przelewy24.
+                                        </p>
+                                        {enrollmentId && (
+                                            <p className="wizMeta">
+                                                ID zapisu: <strong>{enrollmentId}</strong>
+                                            </p>
+                                        )}
+
+                                        <div className="wizActions">
+                                            <button type="button" className="pill beige" onClick={() => setStep(3)}>
+                                                Wstecz
+                                            </button>
+                                            <div className="wizActionsRight">
+                                                <button type="button" className="pill navy" disabled>
+                                                    Płatność (wkrótce)
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </>
+                                )}
+                            </div>
+                        )}
                     </div>
-
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                        <div style={{ display: 'grid', gap: 6 }}>
-                            <label>Email</label>
-                            <input type="email" value={form.email} onChange={(e) => set('email', e.target.value)} required />
-                        </div>
-                        <div style={{ display: 'grid', gap: 6 }}>
-                            <label>Telefon</label>
-                            <input value={form.phone} onChange={(e) => set('phone', e.target.value)} required />
-                        </div>
-                    </div>
-
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                        <div style={{ display: 'grid', gap: 6 }}>
-                            <label>PESEL</label>
-                            <input value={form.pesel} onChange={(e) => set('pesel', e.target.value)} required />
-                        </div>
-                        <div style={{ display: 'grid', gap: 6 }}>
-                            <label>Kod pocztowy</label>
-                            <input value={form.postalCode} onChange={(e) => set('postalCode', e.target.value)} required />
-                        </div>
-                    </div>
-
-                    <div style={{ display: 'grid', gap: 6 }}>
-                        <label>Adres (ulica i numer)</label>
-                        <input value={form.addressLine1} onChange={(e) => set('addressLine1', e.target.value)} required />
-                    </div>
-
-                    <div style={{ display: 'grid', gap: 6 }}>
-                        <label>Adres cd. (opcjonalnie)</label>
-                        <input value={form.addressLine2 ?? ''} onChange={(e) => set('addressLine2', e.target.value)} />
-                    </div>
-
-                    <div style={{ display: 'grid', gap: 6 }}>
-                        <label>Miasto</label>
-                        <input value={form.city} onChange={(e) => set('city', e.target.value)} required />
-                    </div>
-
-                    <label style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                        <input
-                            type="checkbox"
-                            checked={form.acceptedTerms}
-                            onChange={(e) => set('acceptedTerms', e.target.checked)}
-                            required
-                        />
-                        Akceptuję regulamin
-                    </label>
-
-                    <label style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                        <input
-                            type="checkbox"
-                            checked={form.acceptedPrivacy}
-                            onChange={(e) => set('acceptedPrivacy', e.target.checked)}
-                            required
-                        />
-                        Akceptuję politykę prywatności
-                    </label>
-
-                    <button type="submit">Zapisz się</button>
-                </form>
-            )}
-        </main>
+                </section>
+            </main>
+        </>
     );
 }
