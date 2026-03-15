@@ -115,8 +115,8 @@ function sanitizeEmail(value: string): string {
     return value.trim().toLowerCase().replace(/\s+/g, '');
 }
 
-function Stepper({ current }: { current: 1 | 2 | 3 | 4 }) {
-    const steps: Array<1 | 2 | 3 | 4> = [1, 2, 3, 4];
+function Stepper({ current }: { current: 1 | 2 | 3 | 4 | 5}) {
+    const steps: Array<1 | 2 | 3 | 4 | 5> = [1, 2, 3, 4, 5];
     return (
         <ol className="kpProgress" aria-label="Postęp">
             {steps.map((s) => {
@@ -135,6 +135,15 @@ export default function ZapisPage() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string>('');
     const [enrollmentId, setEnrollmentId] = useState<string>('');
+    const [mockPay, setMockPay] = useState<MockPayResult | null>(null);
+    type MockPayResult = {
+        ok: true;
+        enrollmentId: string;
+        email: string;
+        userCreated: boolean;
+        tempPassword?: string;
+        contractKey: string;
+    };
 
     const [offers, setOffers] = useState<OfferItem[]>([]);
     const courseOffers = useMemo(
@@ -142,7 +151,7 @@ export default function ZapisPage() {
         [offers],
     );
 
-    const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
+    const [step, setStep] = useState<1 | 2 | 3 | 4 | 5>(1);
 
     const [form, setForm] = useState<CreateEnrollmentPayload>({
         offerItemCode: '',
@@ -232,7 +241,7 @@ export default function ZapisPage() {
         setForm((p) => ({ ...p, offerItemCode: offer.code, courseCategoryId: catId }));
     };
 
-    const validateStep = (s: 1 | 2 | 3 | 4): string | null => {
+    const validateStep = (s: 1 | 2 | 3 | 4 | 5): string | null => {
         if (s === 1) {
             if (!form.offerItemCode) return 'Wybierz kurs.';
             return null;
@@ -259,7 +268,7 @@ export default function ZapisPage() {
         const msg = validateStep(step);
         if (msg) return setError(msg);
         setError('');
-        setStep((prev) => (prev === 1 ? 2 : prev === 2 ? 3 : 4));
+        setStep((prev) => (prev === 1 ? 2 : prev === 2 ? 3 : prev === 3 ? 4 : 5));
     };
 
     const back = () => {
@@ -268,8 +277,6 @@ export default function ZapisPage() {
     };
 
     const submit = async () => {
-        console.log('SUBMIT PESEL:', form.pesel, 'len=', form.pesel.length);
-
         const msg = validateStep(3);
         if (msg) return setError(msg);
 
@@ -313,9 +320,48 @@ export default function ZapisPage() {
                 throw new Error(msg);
             }
 
-            const created = await res.json();
-            setEnrollmentId(created.id);
+            const createdRaw: unknown = await res.json();
+            const createdId =
+                createdRaw &&
+                typeof createdRaw === 'object' &&
+                'id' in createdRaw &&
+                typeof (createdRaw as { id: unknown }).id === 'string'
+                    ? (createdRaw as { id: string }).id
+                    : null;
+
+            if (!createdId) throw new Error('Nie udało się odczytać id zapisu.');
+
+            setEnrollmentId(createdId);
             setStep(4);
+
+            const payRes = await fetch(`${API_URL}/enrollments/${createdId}/mock-pay`, {
+                method: 'POST',
+            });
+
+            if (!payRes.ok) {
+                const body = await payRes.json().catch(() => null);
+                const msg =
+                    body?.message
+                        ? Array.isArray(body.message)
+                            ? body.message.join('\n')
+                            : String(body.message)
+                        : `Błąd symulacji płatności (HTTP ${payRes.status})`;
+                throw new Error(msg);
+            }
+
+            const payRaw: unknown = await payRes.json();
+            const pay =
+                payRaw &&
+                typeof payRaw === 'object' &&
+                'ok' in payRaw &&
+                (payRaw as { ok: unknown }).ok === true
+                    ? (payRaw as MockPayResult)
+                    : null;
+
+            if (!pay) throw new Error('Nieprawidłowa odpowiedź z mock-pay.');
+
+            setMockPay(pay);
+            setStep(5);
         } catch (e) {
             setError(e instanceof Error ? e.message : 'Błąd zapisu');
         }
@@ -366,7 +412,7 @@ export default function ZapisPage() {
                                         {step === 3 && '3) Podsumowanie'}
                                         {step === 4 && '4) Płatność'}
                                     </h2>
-                                    <p className="wizMeta">Krok {step} z 4</p>
+                                    <p className="wizMeta">Krok {step} z 5</p>
                                 </div>
 
                                 {error && <p style={{ color: 'crimson', whiteSpace: 'pre-wrap', marginTop: 0 }}>{error}</p>}
@@ -713,6 +759,36 @@ export default function ZapisPage() {
                                                 <button type="button" className="pill navy" disabled>
                                                     Płatność (wkrótce)
                                                 </button>
+                                            </div>
+                                        </div>
+                                    </>
+                                )}
+
+                                {step === 5 && (
+                                    <>
+                                        <p className="wizMeta" style={{ marginTop: 0 }}>
+                                            Płatność została potwierdzona. Możesz teraz zalogować się do panelu kursanta lub wrócić na stronę główną.
+                                        </p>
+
+                                        {mockPay?.userCreated && mockPay.tempPassword ? (
+                                            <p className="wizMeta">
+                                                Dane testowe do logowania: <strong>{mockPay.email}</strong> / <strong>{mockPay.tempPassword}</strong>
+                                            </p>
+                                        ) : (
+                                            <p className="wizMeta">
+                                                Email konta: <strong>{mockPay?.email}</strong>
+                                            </p>
+                                        )}
+
+                                        <div className="wizActions">
+                                            <Link className="pill beige" href="/start">
+                                                Wróć na stronę główną
+                                            </Link>
+
+                                            <div className="wizActionsRight">
+                                                <Link className="pill navy" href="/logowanie">
+                                                    Zaloguj się do panelu
+                                                </Link>
                                             </div>
                                         </div>
                                     </>
