@@ -50,8 +50,16 @@ export class AdminController {
       email?: string;
       phone?: string;
       password?: string;
+      firstName?: string;
+      lastName?: string;
+      categoryCodes?: string[];
     },
   ) {
     return this.admin.createInstructor(body);
+  }
+
+  @Get('course-categories')
+  getCourseCategories() {
+    return this.admin.listCourseCategories();
   }
 }

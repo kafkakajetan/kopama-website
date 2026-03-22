@@ -46,7 +46,7 @@ export class AuthController {
   }
 
   @Post('logout')
-  logout(@Res({ passthrough: true }) res: Response) {
+  logout(@Res({ passthrough: true }) res: Response): { ok: true } {
     res.clearCookie('access_token', { path: '/' });
     return { ok: true };
   }

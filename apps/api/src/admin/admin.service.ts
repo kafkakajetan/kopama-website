@@ -25,6 +25,16 @@ export class AdminService {
         email: true,
         phone: true,
         role: true,
+        firstName: true,
+        lastName: true,
+        specializations: {
+          select: {
+            id: true,
+            code: true,
+            name: true,
+          },
+          orderBy: { name: 'asc' },
+        },
       },
     });
   }
@@ -33,12 +43,20 @@ export class AdminService {
     email?: string;
     phone?: string;
     password?: string;
+    firstName?: string;
+    lastName?: string;
+    categoryCodes?: string[];
   }) {
     const email = String(body.email ?? '')
       .trim()
       .toLowerCase();
     const phone = body.phone ? String(body.phone).trim() : null;
     const password = String(body.password ?? '');
+    const firstName = String(body.firstName ?? '').trim();
+    const lastName = String(body.lastName ?? '').trim();
+    const categoryCodes = Array.isArray(body.categoryCodes)
+      ? body.categoryCodes.map((code) => String(code).trim()).filter(Boolean)
+      : [];
 
     if (!email) {
       throw new BadRequestException('Email jest wymagany.');
@@ -48,12 +66,26 @@ export class AdminService {
       throw new BadRequestException('Nieprawidłowy email.');
     }
 
+    if (!firstName) {
+      throw new BadRequestException('Imię jest wymagane.');
+    }
+
+    if (!lastName) {
+      throw new BadRequestException('Nazwisko jest wymagane.');
+    }
+
     if (phone && !/^\+48\d{9}$/.test(phone)) {
       throw new BadRequestException('Telefon musi mieć format +48 i 9 cyfr.');
     }
 
     if (password.length < 8) {
       throw new BadRequestException('Hasło musi mieć co najmniej 8 znaków.');
+    }
+
+    if (categoryCodes.length === 0) {
+      throw new BadRequestException(
+        'Wybierz co najmniej jedną kategorię specjalizacji.',
+      );
     }
 
     const existing = await this.prisma.user.findUnique({
@@ -65,6 +97,22 @@ export class AdminService {
       throw new ConflictException('Użytkownik z tym emailem już istnieje.');
     }
 
+    const categories = await this.prisma.courseCategory.findMany({
+      where: {
+        code: { in: categoryCodes },
+      },
+      select: {
+        id: true,
+        code: true,
+      },
+    });
+
+    if (categories.length !== categoryCodes.length) {
+      throw new BadRequestException(
+        'Wybrano nieprawidłową kategorię specjalizacji.',
+      );
+    }
+
     const passwordHash = await bcrypt.hash(password, 10);
 
     return this.prisma.user.create({
@@ -73,6 +121,11 @@ export class AdminService {
         phone,
         passwordHash,
         role: UserRole.INSTRUCTOR,
+        firstName,
+        lastName,
+        specializations: {
+          connect: categories.map((category) => ({ id: category.id })),
+        },
       },
       select: {
         id: true,
@@ -80,6 +133,16 @@ export class AdminService {
         email: true,
         phone: true,
         role: true,
+        firstName: true,
+        lastName: true,
+        specializations: {
+          select: {
+            id: true,
+            code: true,
+            name: true,
+          },
+          orderBy: { name: 'asc' },
+        },
       },
     });
   }
@@ -94,6 +157,17 @@ export class AdminService {
         email: true,
         phone: true,
         role: true,
+      },
+    });
+  }
+
+  async listCourseCategories() {
+    return this.prisma.courseCategory.findMany({
+      orderBy: { name: 'asc' },
+      select: {
+        id: true,
+        code: true,
+        name: true,
       },
     });
   }
