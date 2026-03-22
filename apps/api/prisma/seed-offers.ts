@@ -1,27 +1,21 @@
-import 'dotenv/config';
-import { PrismaClient } from '@prisma/client';
-import { PrismaPg } from '@prisma/adapter-pg';
+import type { PrismaClient } from '@prisma/client';
 
 const VALID_FROM = new Date('2000-01-01T00:00:00.000Z');
 const VALID_TO = new Date('2099-12-31T23:59:59.999Z');
 
-const connectionString = process.env.DATABASE_URL;
-if (!connectionString) throw new Error('Brak DATABASE_URL w apps/api/.env');
-
-const prisma = new PrismaClient({
-  adapter: new PrismaPg({ connectionString }),
-});
-
 type Price = { customerType: 'PUBLIC' | 'KOPAMA_STUDENT'; priceZloty: string };
 
-async function upsertOffer(params: {
-  code: string;
-  name: string;
-  type: 'COURSE' | 'EXTRA_HOUR' | 'EXAM_CAR' | 'TRAINING_PACKAGE' | 'OTHER';
-  unit: 'PACKAGE' | 'HOUR' | 'SERVICE';
-  courseCategoryCode?: string;
-  prices: Price[];
-}) {
+async function upsertOffer(
+  prisma: PrismaClient,
+  params: {
+    code: string;
+    name: string;
+    type: 'COURSE' | 'EXTRA_HOUR' | 'EXAM_CAR' | 'TRAINING_PACKAGE' | 'OTHER';
+    unit: 'PACKAGE' | 'HOUR' | 'SERVICE';
+    courseCategoryCode?: string;
+    prices: Price[];
+  },
+) {
   const courseCategory = params.courseCategoryCode
     ? await prisma.courseCategory.findUnique({
         where: { code: params.courseCategoryCode },
@@ -75,9 +69,8 @@ async function upsertOffer(params: {
   }
 }
 
-async function main() {
-  // Kursy (PUBLIC)
-  await upsertOffer({
+export async function seedOffers(prisma: PrismaClient) {
+  await upsertOffer(prisma, {
     code: 'COURSE_B',
     name: 'Kategoria B',
     type: 'COURSE',
@@ -86,7 +79,7 @@ async function main() {
     prices: [{ customerType: 'PUBLIC', priceZloty: '4100.00' }],
   });
 
-  await upsertOffer({
+  await upsertOffer(prisma, {
     code: 'COURSE_B_AUT',
     name: 'Kategoria B automat',
     type: 'COURSE',
@@ -95,7 +88,7 @@ async function main() {
     prices: [{ customerType: 'PUBLIC', priceZloty: '4300.00' }],
   });
 
-  await upsertOffer({
+  await upsertOffer(prisma, {
     code: 'COURSE_B_NO_THEORY',
     name: 'Kategoria B bez teorii',
     type: 'COURSE',
@@ -104,7 +97,7 @@ async function main() {
     prices: [{ customerType: 'PUBLIC', priceZloty: '4000.00' }],
   });
 
-  await upsertOffer({
+  await upsertOffer(prisma, {
     code: 'COURSE_B_AUT_NO_THEORY',
     name: 'Kategoria B automat bez teorii',
     type: 'COURSE',
@@ -113,7 +106,7 @@ async function main() {
     prices: [{ customerType: 'PUBLIC', priceZloty: '4200.00' }],
   });
 
-  await upsertOffer({
+  await upsertOffer(prisma, {
     code: 'COURSE_B_INDIVIDUAL',
     name: 'Kategoria B kurs indywidualny',
     type: 'COURSE',
@@ -122,7 +115,7 @@ async function main() {
     prices: [{ customerType: 'PUBLIC', priceZloty: '6900.00' }],
   });
 
-  await upsertOffer({
+  await upsertOffer(prisma, {
     code: 'COURSE_B_AFTER_B1',
     name: 'Kategoria B po B1',
     type: 'COURSE',
@@ -131,8 +124,7 @@ async function main() {
     prices: [{ customerType: 'PUBLIC', priceZloty: '2700.00' }],
   });
 
-  // Pakiet 14h
-  await upsertOffer({
+  await upsertOffer(prisma, {
     code: 'PACKAGE_14H',
     name: 'Szkolenie uzupełniające 14h',
     type: 'TRAINING_PACKAGE',
@@ -141,8 +133,7 @@ async function main() {
     prices: [{ customerType: 'PUBLIC', priceZloty: '2100.00' }],
   });
 
-  // Godziny
-  await upsertOffer({
+  await upsertOffer(prisma, {
     code: 'HOUR_B',
     name: 'Godzina uzupełniająca kat. B',
     type: 'EXTRA_HOUR',
@@ -154,7 +145,7 @@ async function main() {
     ],
   });
 
-  await upsertOffer({
+  await upsertOffer(prisma, {
     code: 'HOUR_B_AUT',
     name: 'Godzina uzupełniająca kat. B automat',
     type: 'EXTRA_HOUR',
@@ -166,8 +157,7 @@ async function main() {
     ],
   });
 
-  // Podstawienie auta na egzamin
-  await upsertOffer({
+  await upsertOffer(prisma, {
     code: 'EXAM_CAR',
     name: 'Podstawienie pojazdu na egzamin',
     type: 'EXAM_CAR',
@@ -178,7 +168,3 @@ async function main() {
     ],
   });
 }
-
-main().finally(async () => {
-  await prisma.$disconnect();
-});

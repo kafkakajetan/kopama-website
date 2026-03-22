@@ -1,15 +1,4 @@
-import 'dotenv/config';
-import { PrismaClient } from '@prisma/client';
-import { PrismaPg } from '@prisma/adapter-pg';
-
-const connectionString = process.env.DATABASE_URL;
-if (!connectionString) {
-  throw new Error('Brak DATABASE_URL w apps/api/.env');
-}
-
-const prisma = new PrismaClient({
-  adapter: new PrismaPg({ connectionString }),
-});
+import type { PrismaClient } from '@prisma/client';
 
 const categories = [
   { code: 'B', name: 'Kat. B' },
@@ -20,7 +9,7 @@ const categories = [
   { code: 'B_AFTER_B1', name: 'Kat. B po B1' },
 ];
 
-async function main() {
+export async function seedCourseCategories(prisma: PrismaClient) {
   for (const c of categories) {
     await prisma.courseCategory.upsert({
       where: { code: c.code },
@@ -29,7 +18,3 @@ async function main() {
     });
   }
 }
-
-main().finally(async () => {
-  await prisma.$disconnect();
-});
