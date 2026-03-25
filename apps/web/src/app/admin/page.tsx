@@ -21,10 +21,12 @@ type Student = {
     role: string;
 };
 
-type CourseCategory = {
+type DrivingCategory = {
     id: string;
     code: string;
     name: string;
+    minAge: number | null;
+    description: string | null;
 };
 
 type Instructor = {
@@ -35,7 +37,11 @@ type Instructor = {
     role: string;
     firstName: string | null;
     lastName: string | null;
-    specializations: CourseCategory[];
+    drivingCategories: {
+        id: string;
+        code: string;
+        name: string;
+    }[];
 };
 
 type ContractItem = {
@@ -58,7 +64,7 @@ export default function AdminPage() {
 
     const [me, setMe] = useState<Me | null>(null);
     const [students, setStudents] = useState<Student[]>([]);
-    const [courseCategories, setCourseCategories] = useState<CourseCategory[]>([]);
+    const [drivingCategories, setDrivingCategories] = useState<DrivingCategory[]>([]);
     const [instructors, setInstructors] = useState<Instructor[]>([]);
 
     const [newInstructorEmail, setNewInstructorEmail] = useState('');
@@ -66,7 +72,7 @@ export default function AdminPage() {
     const [newInstructorPassword, setNewInstructorPassword] = useState('');
     const [newInstructorFirstName, setNewInstructorFirstName] = useState('');
     const [newInstructorLastName, setNewInstructorLastName] = useState('');
-    const [selectedCategoryCodes, setSelectedCategoryCodes] = useState<string[]>([]);
+    const [selectedDrivingCategoryCodes, setSelectedDrivingCategoryCodes] = useState<string[]>([]);
 
     const [createInstructorError, setCreateInstructorError] = useState('');
     const [createInstructorOk, setCreateInstructorOk] = useState('');
@@ -109,7 +115,7 @@ export default function AdminPage() {
             fetch(`${API_URL}/admin/students`, {credentials: 'include'}),
             fetch(`${API_URL}/admin/instructors`, {credentials: 'include'}),
             fetch(`${API_URL}/admin/contracts`, {credentials: 'include'}),
-            fetch(`${API_URL}/admin/course-categories`, {credentials: 'include'}),
+            fetch(`${API_URL}/admin/driving-categories`, {credentials: 'include'}),
         ]);
 
         if (studentsRes.status === 403 || contractsRes.status === 403) {
@@ -136,12 +142,12 @@ export default function AdminPage() {
         const studentsData = (await studentsRes.json()) as Student[];
         const instructorsData = (await instructorsRes.json()) as Instructor[];
         const contractsData = (await contractsRes.json()) as ContractItem[];
-        const categoriesData = (await categoriesRes.json()) as CourseCategory[];
+        const drivingCategoriesData = (await categoriesRes.json()) as DrivingCategory[];
 
         setStudents(studentsData);
         setInstructors(instructorsData);
         setContracts(contractsData);
-        setCourseCategories(categoriesData);
+        setDrivingCategories(drivingCategoriesData);
     };
 
     useEffect(() => {
@@ -242,7 +248,7 @@ export default function AdminPage() {
 
             const res = await fetch(`${API_URL}/admin/instructors`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: {'Content-Type': 'application/json'},
                 credentials: 'include',
                 body: JSON.stringify({
                     email: newInstructorEmail.trim().toLowerCase(),
@@ -250,7 +256,7 @@ export default function AdminPage() {
                     password: newInstructorPassword,
                     firstName: newInstructorFirstName.trim(),
                     lastName: newInstructorLastName.trim(),
-                    categoryCodes: selectedCategoryCodes,
+                    drivingCategoryCodes: selectedDrivingCategoryCodes,
                 }),
             });
 
@@ -268,15 +274,15 @@ export default function AdminPage() {
             setNewInstructorPassword('');
             setNewInstructorFirstName('');
             setNewInstructorLastName('');
-            setSelectedCategoryCodes([]);
+            setSelectedDrivingCategoryCodes([]);
             setCreateInstructorOk('Instruktor został utworzony.');
         } catch (e) {
             setCreateInstructorError(e instanceof Error ? e.message : 'Błąd tworzenia instruktora');
         }
     };
 
-    const toggleCategory = (code: string) => {
-        setSelectedCategoryCodes((prev) =>
+    const toggleDrivingCategory = (code: string) => {
+        setSelectedDrivingCategoryCodes((prev) =>
             prev.includes(code) ? prev.filter((item) => item !== code) : [...prev, code],
         );
     };
@@ -391,7 +397,19 @@ export default function AdminPage() {
                                         {createInstructorOk}
                                     </div>
                                 ) : null}
+                                <label>Imię</label>
+                                <input
+                                    value={newInstructorFirstName}
+                                    onChange={(e) => setNewInstructorFirstName(e.target.value)}
+                                    type="text"
+                                />
 
+                                <label>Nazwisko</label>
+                                <input
+                                    value={newInstructorLastName}
+                                    onChange={(e) => setNewInstructorLastName(e.target.value)}
+                                    type="text"
+                                />
                                 <label>Email</label>
                                 <input
                                     value={newInstructorEmail}
@@ -414,7 +432,31 @@ export default function AdminPage() {
                                     type="password"
                                     autoComplete="new-password"
                                 />
-
+                                <label>Kategorie prawa jazdy</label>
+                                <div style={{display: 'grid', gap: 10, marginTop: 8}}>
+                                    {drivingCategories.map((category) => (
+                                        <label
+                                            key={category.code}
+                                            style={{
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: 10,
+                                                border: '1px solid rgba(255,255,255,.12)',
+                                                borderRadius: 12,
+                                                padding: '10px 12px',
+                                            }}
+                                        >
+                                            <input
+                                                type="checkbox"
+                                                checked={selectedDrivingCategoryCodes.includes(category.code)}
+                                                onChange={() => toggleDrivingCategory(category.code)}
+                                            />
+                                            <span>
+                                                {category.name} ({category.code})
+                                            </span>
+                                        </label>
+                                    ))}
+                                </div>
                                 <button className="submit navy" type="button" onClick={createInstructor}>
                                     Utwórz instruktora
                                 </button>
@@ -490,38 +532,30 @@ export default function AdminPage() {
                                     <table style={{width: '100%', borderCollapse: 'collapse'}}>
                                         <thead>
                                         <tr>
-                                            <th style={{textAlign: 'left', padding: '10px 8px'}}>Data</th>
-                                            <th style={{textAlign: 'left', padding: '10px 8px'}}>Email</th>
-                                            <th style={{textAlign: 'left', padding: '10px 8px'}}>Telefon</th>
-                                            <th style={{textAlign: 'left', padding: '10px 8px'}}>Rola</th>
+                                            <th style={{ textAlign: 'left', padding: '10px 8px' }}>Data</th>
+                                            <th style={{ textAlign: 'left', padding: '10px 8px' }}>Imię i nazwisko</th>
+                                            <th style={{ textAlign: 'left', padding: '10px 8px' }}>Email</th>
+                                            <th style={{ textAlign: 'left', padding: '10px 8px' }}>Telefon</th>
+                                            <th style={{ textAlign: 'left', padding: '10px 8px' }}>Kategorie</th>
                                         </tr>
                                         </thead>
                                         <tbody>
                                         {instructors.map((instructor) => (
                                             <tr key={instructor.id}>
-                                                <td style={{
-                                                    padding: '10px 8px',
-                                                    borderTop: '1px solid rgba(255,255,255,.12)'
-                                                }}>
+                                                <td style={{ padding: '10px 8px', borderTop: '1px solid rgba(255,255,255,.12)' }}>
                                                     {new Date(instructor.createdAt).toLocaleString('pl-PL')}
                                                 </td>
-                                                <td style={{
-                                                    padding: '10px 8px',
-                                                    borderTop: '1px solid rgba(255,255,255,.12)'
-                                                }}>
+                                                <td style={{ padding: '10px 8px', borderTop: '1px solid rgba(255,255,255,.12)' }}>
+                                                    {[instructor.firstName, instructor.lastName].filter(Boolean).join(' ') || '—'}
+                                                </td>
+                                                <td style={{ padding: '10px 8px', borderTop: '1px solid rgba(255,255,255,.12)' }}>
                                                     {instructor.email}
                                                 </td>
-                                                <td style={{
-                                                    padding: '10px 8px',
-                                                    borderTop: '1px solid rgba(255,255,255,.12)'
-                                                }}>
+                                                <td style={{ padding: '10px 8px', borderTop: '1px solid rgba(255,255,255,.12)' }}>
                                                     {instructor.phone ?? '—'}
                                                 </td>
-                                                <td style={{
-                                                    padding: '10px 8px',
-                                                    borderTop: '1px solid rgba(255,255,255,.12)'
-                                                }}>
-                                                    {instructor.role}
+                                                <td style={{ padding: '10px 8px', borderTop: '1px solid rgba(255,255,255,.12)' }}>
+                                                    {instructor.drivingCategories.map((item) => item.code).join(', ') || '—'}
                                                 </td>
                                             </tr>
                                         ))}

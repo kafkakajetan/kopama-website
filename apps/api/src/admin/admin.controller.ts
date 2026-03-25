@@ -58,8 +58,8 @@ export class AdminController {
     return this.admin.createInstructor(body);
   }
 
-  @Get('course-categories')
-  getCourseCategories() {
-    return this.admin.listCourseCategories();
+  @Get('driving-categories')
+  getDrivingCategories() {
+    return this.admin.listDrivingCategories();
   }
 }

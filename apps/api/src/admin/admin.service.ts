@@ -27,7 +27,7 @@ export class AdminService {
         role: true,
         firstName: true,
         lastName: true,
-        specializations: {
+        drivingCategories: {
           select: {
             id: true,
             code: true,
@@ -45,7 +45,7 @@ export class AdminService {
     password?: string;
     firstName?: string;
     lastName?: string;
-    categoryCodes?: string[];
+    drivingCategoryCodes?: string[];
   }) {
     const email = String(body.email ?? '')
       .trim()
@@ -54,8 +54,10 @@ export class AdminService {
     const password = String(body.password ?? '');
     const firstName = String(body.firstName ?? '').trim();
     const lastName = String(body.lastName ?? '').trim();
-    const categoryCodes = Array.isArray(body.categoryCodes)
-      ? body.categoryCodes.map((code) => String(code).trim()).filter(Boolean)
+    const drivingCategoryCodes = Array.isArray(body.drivingCategoryCodes)
+      ? body.drivingCategoryCodes
+          .map((code) => String(code).trim())
+          .filter(Boolean)
       : [];
 
     if (!email) {
@@ -82,9 +84,9 @@ export class AdminService {
       throw new BadRequestException('Hasło musi mieć co najmniej 8 znaków.');
     }
 
-    if (categoryCodes.length === 0) {
+    if (drivingCategoryCodes.length === 0) {
       throw new BadRequestException(
-        'Wybierz co najmniej jedną kategorię specjalizacji.',
+        'Wybierz co najmniej jedną kategorię prawa jazdy.',
       );
     }
 
@@ -97,19 +99,20 @@ export class AdminService {
       throw new ConflictException('Użytkownik z tym emailem już istnieje.');
     }
 
-    const categories = await this.prisma.courseCategory.findMany({
+    const categories = await this.prisma.drivingCategory.findMany({
       where: {
-        code: { in: categoryCodes },
+        code: { in: drivingCategoryCodes },
       },
       select: {
         id: true,
         code: true,
+        name: true,
       },
     });
 
-    if (categories.length !== categoryCodes.length) {
+    if (categories.length !== drivingCategoryCodes.length) {
       throw new BadRequestException(
-        'Wybrano nieprawidłową kategorię specjalizacji.',
+        'Wybrano nieprawidłową kategorię prawa jazdy.',
       );
     }
 
@@ -123,7 +126,7 @@ export class AdminService {
         role: UserRole.INSTRUCTOR,
         firstName,
         lastName,
-        specializations: {
+        drivingCategories: {
           connect: categories.map((category) => ({ id: category.id })),
         },
       },
@@ -135,7 +138,7 @@ export class AdminService {
         role: true,
         firstName: true,
         lastName: true,
-        specializations: {
+        drivingCategories: {
           select: {
             id: true,
             code: true,
@@ -161,13 +164,15 @@ export class AdminService {
     });
   }
 
-  async listCourseCategories() {
-    return this.prisma.courseCategory.findMany({
-      orderBy: { name: 'asc' },
+  async listDrivingCategories() {
+    return this.prisma.drivingCategory.findMany({
+      orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
       select: {
         id: true,
         code: true,
         name: true,
+        minAge: true,
+        description: true,
       },
     });
   }
