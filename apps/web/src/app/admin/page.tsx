@@ -141,7 +141,7 @@ export default function AdminPage() {
         setStudents(studentsData);
         setInstructors(instructorsData);
         setContracts(contractsData);
-        set
+        setCourseCategories(categoriesData);
     };
 
     useEffect(() => {
@@ -242,12 +242,15 @@ export default function AdminPage() {
 
             const res = await fetch(`${API_URL}/admin/instructors`, {
                 method: 'POST',
-                headers: {'Content-Type': 'application/json'},
+                headers: { 'Content-Type': 'application/json' },
                 credentials: 'include',
                 body: JSON.stringify({
                     email: newInstructorEmail.trim().toLowerCase(),
                     phone: newInstructorPhone.trim(),
                     password: newInstructorPassword,
+                    firstName: newInstructorFirstName.trim(),
+                    lastName: newInstructorLastName.trim(),
+                    categoryCodes: selectedCategoryCodes,
                 }),
             });
 
@@ -263,9 +266,33 @@ export default function AdminPage() {
             setNewInstructorEmail('');
             setNewInstructorPhone('');
             setNewInstructorPassword('');
+            setNewInstructorFirstName('');
+            setNewInstructorLastName('');
+            setSelectedCategoryCodes([]);
             setCreateInstructorOk('Instruktor został utworzony.');
         } catch (e) {
             setCreateInstructorError(e instanceof Error ? e.message : 'Błąd tworzenia instruktora');
+        }
+    };
+
+    const toggleCategory = (code: string) => {
+        setSelectedCategoryCodes((prev) =>
+            prev.includes(code) ? prev.filter((item) => item !== code) : [...prev, code],
+        );
+    };
+
+    const logout = async () => {
+        try {
+            if (!API_URL) throw new Error('Brak NEXT_PUBLIC_API_URL');
+
+            await fetch(`${API_URL}/auth/logout`, {
+                method: 'POST',
+                credentials: 'include',
+            });
+
+            router.push('/logowanie');
+        } catch {
+            router.push('/logowanie');
         }
     };
 
@@ -284,6 +311,9 @@ export default function AdminPage() {
                     <Link className="pill beige" href="/start">
                         Start
                     </Link>
+                    <button className="pill" type="button" onClick={logout}>
+                        Wyloguj
+                    </button>
                 </div>
             </div>
 

@@ -2,11 +2,13 @@ import { prisma } from './seed-client';
 import { seedCourseCategories } from './seed-course-categories';
 import { seedOffers } from './seed-offers';
 import { seedAdmin } from './seed-admin';
+import { seedDrivingCategories } from './seed-driving-categories';
 
 async function main() {
   await seedCourseCategories(prisma);
   await seedOffers(prisma);
   await seedAdmin(prisma);
+  await seedDrivingCategories(prisma);
 }
 
 main()

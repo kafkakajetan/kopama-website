@@ -47,6 +47,18 @@ model User {
   lastName        String?
 
   specializations CourseCategory[] @relation("InstructorSpecializations")
+  drivingCategories  DrivingCategory[] @relation("InstructorDrivingCategories")
+}
+
+model DrivingCategory {
+  id          String @id @default(cuid())
+  code        String @unique
+  name        String
+  minAge      Int?
+  description String?
+  sortOrder   Int    @default(0)
+
+  instructors User[] @relation("InstructorDrivingCategories")
 }
 
 model CourseCategory {
