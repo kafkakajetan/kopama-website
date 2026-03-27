@@ -188,7 +188,9 @@ export class AdminService {
 
     const contracts = await Promise.all(
       files
-        .filter((file) => file.toLowerCase().endsWith('.txt'))
+        .filter((file) =>
+          ['.txt', '.pdf'].includes(path.extname(file).toLowerCase()),
+        )
         .map(async (absolutePath) => {
           const fileStat = await stat(absolutePath);
           const relativePath = path
