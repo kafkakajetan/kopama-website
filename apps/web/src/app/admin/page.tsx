@@ -19,6 +19,7 @@ export default function AdminPage() {
 
     const [currentPassword, setCurrentPassword] = useState('');
     const [newPassword, setNewPassword] = useState('');
+    const [confirmNewPassword, setConfirmNewPassword] = useState('');
     const [passwordError, setPasswordError] = useState('');
     const [passwordOk, setPasswordOk] = useState('');
 
@@ -93,6 +94,26 @@ export default function AdminPage() {
             setPasswordError('');
             setPasswordOk('');
 
+            if (!currentPassword.trim()) {
+                setPasswordError('Podaj obecne hasło.');
+                return;
+            }
+
+            if (!newPassword.trim()) {
+                setPasswordError('Podaj nowe hasło.');
+                return;
+            }
+
+            if (!confirmNewPassword.trim()) {
+                setPasswordError('Powtórz nowe hasło.');
+                return;
+            }
+
+            if (newPassword !== confirmNewPassword) {
+                setPasswordError('Nowe hasło i powtórzone hasło muszą być takie same.');
+                return;
+            }
+
             if (!API_URL) throw new Error('Brak NEXT_PUBLIC_API_URL');
 
             const res = await fetch(`${API_URL}/me/password`, {
@@ -113,6 +134,7 @@ export default function AdminPage() {
 
             setCurrentPassword('');
             setNewPassword('');
+            setConfirmNewPassword('');
             setPasswordOk('Hasło zostało zmienione.');
         } catch (e) {
             setPasswordError(e instanceof Error ? e.message : 'Błąd zmiany hasła');
@@ -142,9 +164,9 @@ export default function AdminPage() {
                 <main className="hero">
                     <section className="shell">
                         <div className="hero-inner">
-                            <h1 className="headline">
+                            <h4 className="headline">
                                 Zarządzanie <span className="accent">kursantami i umowami</span>
-                            </h1>
+                            </h4>
 
                             {error ? <div className="alert show">{error}</div> : <div className="alert" />}
 
@@ -184,6 +206,14 @@ export default function AdminPage() {
                                     <input
                                         value={newPassword}
                                         onChange={(e) => setNewPassword(e.target.value)}
+                                        type="password"
+                                        autoComplete="new-password"
+                                    />
+
+                                    <label>Powtórz nowe hasło</label>
+                                    <input
+                                        value={confirmNewPassword}
+                                        onChange={(e) => setConfirmNewPassword(e.target.value)}
                                         type="password"
                                         autoComplete="new-password"
                                     />
