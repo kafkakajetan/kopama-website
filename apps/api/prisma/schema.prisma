@@ -68,6 +68,7 @@ model CourseCategory {
   enrollments Enrollment[]
   offerItems  OfferItem[]
   instructors  User[] @relation("InstructorSpecializations")
+  startSlots CourseStartSlot[]
 }
 
 model Enrollment {
@@ -222,4 +223,19 @@ model PriceRule {
 
   @@unique([offerItemId, customerType, validFrom, validTo])
   @@index([offerItemId])
+}
+
+model CourseStartSlot {
+  id               String         @id @default(cuid())
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+  startDate        DateTime
+  isActive         Boolean        @default(true)
+  notes            String?
+
+  courseCategoryId String
+  courseCategory   CourseCategory @relation(fields: [courseCategoryId], references: [id], onDelete: Cascade)
+
+  @@unique([courseCategoryId, startDate])
+  @@index([courseCategoryId, startDate, isActive])
 }

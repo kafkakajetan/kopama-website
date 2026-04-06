@@ -8,6 +8,7 @@ import { ContractPdfService } from '../contracts/contract-pdf.service';
 import { MailService } from '../mail/mail.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateEnrollmentDto } from './dto/create-enrollment.dto';
+import { CourseStartSlotsService } from '../course-start-slots/course-start-slots.service';
 
 function addMonths(date: Date, months: number): Date {
   const d = new Date(date);
@@ -43,6 +44,7 @@ export class EnrollmentsService {
     private readonly auth: AuthService,
     private readonly contractPdf: ContractPdfService,
     private readonly mailService: MailService,
+    private readonly courseStartSlotsService: CourseStartSlotsService,
   ) {}
 
   async create(
@@ -74,10 +76,15 @@ export class EnrollmentsService {
     }
 
     const minCourseStartAt = addMonths(birthDate, 16 * 12 + 9);
-    const courseStartDate = new Date(dto.courseStartDate);
+    const courseStartDate =
+      this.courseStartSlotsService.normalizeCourseStartDate(
+        dto.courseStartDate,
+      );
+
     if (Number.isNaN(courseStartDate.getTime())) {
       throw new BadRequestException('Nieprawidłowy termin kursu.');
     }
+
     if (isBefore(courseStartDate, minCourseStartAt)) {
       throw new BadRequestException(
         'Termin kursu musi przypadać najwcześniej w dniu ukończenia 16 lat i 9 miesięcy.',
@@ -134,6 +141,19 @@ export class EnrollmentsService {
       throw new BadRequestException(
         'Wybrana kategoria nie pasuje do wybranego kursu.',
       );
+    }
+
+    const availableStartSlot = await this.prisma.courseStartSlot.findFirst({
+      where: {
+        courseCategoryId: offer.courseCategoryId,
+        startDate: courseStartDate,
+        isActive: true,
+      },
+      select: { id: true },
+    });
+
+    if (!availableStartSlot) {
+      throw new BadRequestException('Wybrany termin kursu nie jest dostępny.');
     }
 
     const guardianSameAddress = dto.guardianSameAddress === true;

@@ -1,15 +1,12 @@
 import Link from 'next/link';
+import Image from "next/image";
 
 export default function StartPage() {
     return (
         <>
             <div className="nav">
                 <Link className="brand" href="/start">
-                    <div className="logo">K</div>
-                    <div className="title">
-                        <strong>KopaMa – Panel</strong>
-                        <span>Logowanie / Zapis na kurs</span>
-                    </div>
+                    <Image src="/logo.png" alt="logo" height={100} width={200}/>
                 </Link>
 
                 <div className="nav-actions">
@@ -30,33 +27,34 @@ export default function StartPage() {
 
                             <h1 className="headline">
                                 Z Nami <span className="accent">Nauka</span>
-                                <br />
+                                <br/>
                                 Nabiera <span className="accent">TEMPA.</span>
                             </h1>
 
                             <p className="subline">
-                                Kup kurs online w kilka minut. Po potwierdzeniu płatności utworzymy konto kursanta i prześlemy umowę w PDF
+                                Kup kurs online w kilka minut. Po potwierdzeniu płatności utworzymy konto kursanta i
+                                prześlemy umowę w PDF
                                 oraz link do ePUAP i link do przesłania podpisanej umowy w panelu.
                             </p>
                         </div>
 
                         <div className="startWrap">
                             <div className="startChoice">
-                                {/* LEWA: LOGOWANIE */}
                                 <section className="startCard">
                                     <span className="startBadge">Dla kursantów</span>
 
                                     <div className="startCardBody">
                                         <h2 className="startTitle">Zaloguj się do panelu</h2>
                                         <p className="startDesc">
-                                            Jeśli kupiłeś już kurs i masz aktywne konto, zaloguj się, aby przejść do panelu kursanta.
+                                            Jeśli kupiłeś już kurs i masz aktywne konto, zaloguj się, aby przejść do
+                                            panelu kursanta.
                                         </p>
 
-                                        <div className="startDivider" />
+                                        <div className="startDivider"/>
 
                                         <span className="startCtaHint">
-        Nie pamiętasz dostępu? Skorzystaj z opcji odzyskiwania hasła (dodamy w module logowania).
-      </span>
+                                            Nie pamiętasz dostępu? Skorzystaj z opcji odzyskiwania hasła (dodamy w module logowania).
+                                        </span>
                                     </div>
 
                                     <div className="startCtaRow">
@@ -66,14 +64,14 @@ export default function StartPage() {
                                     </div>
                                 </section>
 
-                                {/* PRAWA: ZAPIS */}
                                 <section className="startCard startCardPrimary">
                                     <span className="startBadge">Rekomendowane</span>
 
                                     <div className="startCardBody">
                                         <h2 className="startTitle">Zapisz się na kurs</h2>
                                         <p className="startDesc">
-                                            Wybierz wariant kursu, uzupełnij dane i opłać zamówienie przez Przelewy24. Konto kursanta tworzymy automatycznie po płatności.
+                                            Wybierz wariant kursu, uzupełnij dane i opłać zamówienie przez Przelewy24.
+                                            Konto kursanta tworzymy automatycznie po płatności.
                                         </p>
 
                                         <ul className="startSteps">
@@ -84,8 +82,8 @@ export default function StartPage() {
                                         </ul>
 
                                         <span className="startCtaHint">
-        Czas wypełnienia: ok. 2–3 min. Dane są weryfikowane po stronie systemu.
-      </span>
+                                            Czas wypełnienia: ok. 2–3 min. Dane są weryfikowane po stronie systemu.
+                                        </span>
                                     </div>
 
                                     <div className="startCtaRow">
@@ -97,7 +95,8 @@ export default function StartPage() {
                             </div>
 
                             <p className="startFootnote">
-                                Po opłaceniu kursu prosimy o podpisanie umowy (ePUAP lub wydruk) i przesłanie podpisanego dokumentu przez panel.
+                                Po opłaceniu kursu prosimy o podpisanie umowy (ePUAP lub wydruk) i przesłanie
+                                podpisanego dokumentu przez panel.
                                 Dopiero wtedy biuro może rozpocząć pełną obsługę Twojego kursu.
                             </p>
                         </div>

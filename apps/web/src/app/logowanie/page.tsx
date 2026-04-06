@@ -3,6 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
@@ -53,11 +54,7 @@ export default function LogowaniePage() {
         <>
             <div className="nav">
                 <Link className="brand" href="/start">
-                    <div className="logo">K</div>
-                    <div className="title">
-                        <strong>KopaMa – Panel</strong>
-                        <span>Logowanie</span>
-                    </div>
+                    <Image src="/logo.png" alt="logo" height={100} width={200}/>
                 </Link>
 
                 <div className="nav-actions">
@@ -70,8 +67,9 @@ export default function LogowaniePage() {
             <main className="hero">
                 <section className="shell">
                     <div className="hero-inner">
-                        <p className="kicker">Panel kursanta</p>
                         <h1 className="headline">
+                            <span className="accent">Panel</span> kursanta
+                            <br/>
                             <span className="accent">Logowanie</span>
                         </h1>
 

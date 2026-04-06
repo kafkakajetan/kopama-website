@@ -8,6 +8,7 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
 const adminNavItems = [
     { href: '/admin', label: 'Panel główny' },
+    { href: '/admin/terminy', label: 'Terminy kursów'},
     { href: '/admin/dodaj-instruktora', label: 'Dodaj instruktora' },
     { href: '/admin/kursanci', label: 'Lista kursantów' },
     { href: '/admin/instruktorzy', label: 'Lista instruktorów' },

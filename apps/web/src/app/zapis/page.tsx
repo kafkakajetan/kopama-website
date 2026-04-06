@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
+import Image from "next/image";
 
 type PriceRule = {
     customerType: 'PUBLIC' | 'KOPAMA_STUDENT';
@@ -10,6 +11,12 @@ type PriceRule = {
 };
 
 type CourseCategory = { id: string; code: string; name: string };
+
+type CourseStartSlot = {
+    id: string;
+    startDate: string;
+    courseCategoryId: string;
+};
 
 type OfferItem = {
     id: string;
@@ -151,6 +158,8 @@ export default function ZapisPage() {
         [offers],
     );
 
+    const [availableStartSlots, setAvailableStartSlots] = useState<CourseStartSlot[]>([]);
+
     const [step, setStep] = useState<1 | 2 | 3 | 4 | 5>(1);
 
     const [form, setForm] = useState<CreateEnrollmentPayload>({
@@ -212,6 +221,8 @@ export default function ZapisPage() {
                     offerItemCode: firstCourse.code,
                     courseCategoryId: firstCourse.courseCategory!.id,
                 }));
+
+                await loadStartSlots(firstCourse.code);
             } catch (e) {
                 setError(e instanceof Error ? e.message : 'Błąd pobierania danych');
             } finally {
@@ -227,6 +238,17 @@ export default function ZapisPage() {
         [courseOffers, form.offerItemCode],
     );
 
+    const filteredStartSlots = useMemo(() => {
+        if (!minCourseStartStr) return availableStartSlots;
+
+        const minDate = new Date(minCourseStartStr).getTime();
+
+        return availableStartSlots.filter((slot) => {
+            const slotDate = new Date(slot.startDate);
+            return slotDate.getTime() >= minDate;
+        });
+    }, [availableStartSlots, minCourseStartStr]);
+
     const set = <K extends keyof CreateEnrollmentPayload>(key: K, value: CreateEnrollmentPayload[K]) => {
         setForm((p) => ({ ...p, [key]: value }));
     };
@@ -237,8 +259,36 @@ export default function ZapisPage() {
             setError(`Wybrany kurs "${offer.name}" nie ma przypisanej kategorii.`);
             return;
         }
+
         setError('');
-        setForm((p) => ({ ...p, offerItemCode: offer.code, courseCategoryId: catId }));
+        setForm((p) => ({
+            ...p,
+            offerItemCode: offer.code,
+            courseCategoryId: catId,
+            courseStartDate: '',
+        }));
+
+        void loadStartSlots(offer.code);
+    };
+
+    const loadStartSlots = async (offerItemCode: string) => {
+        if (!API_URL || !offerItemCode) {
+            setAvailableStartSlots([]);
+            return;
+        }
+
+        const res = await fetch(
+            `${API_URL}/course-start-slots/public?offerItemCode=${encodeURIComponent(offerItemCode)}`,
+            { cache: 'no-store' },
+        );
+
+        if (!res.ok) {
+            setAvailableStartSlots([]);
+            return;
+        }
+
+        const data = (await res.json()) as CourseStartSlot[];
+        setAvailableStartSlots(data);
     };
 
     const validateStep = (s: 1 | 2 | 3 | 4 | 5): string | null => {
@@ -251,6 +301,7 @@ export default function ZapisPage() {
             if (!/^\+48\d{9}$/.test(form.phone)) return 'Telefon musi mieć format +48 i 9 cyfr.';
             if (!/^\d{11}$/.test(form.pesel)) return 'PESEL musi mieć 11 cyfr.';
             if (!/^\d{2}-\d{3}$/.test(form.postalCode)) return 'Kod pocztowy musi mieć format 00-000.';
+            if (!form.courseStartDate) return 'Wybierz termin rozpoczęcia kursu.';
             if (!/^[A-Za-zĄąĆćĘęŁłŃńÓóŚśŹźŻż \-]{2,}$/.test(form.city)) return 'Nieprawidłowa nazwa miasta.';
             if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(form.email)) return 'Podaj poprawny adres e-mail.';
             if (!form.addressLine1 || !form.city || !form.postalCode) return 'Uzupełnij adres.';
@@ -371,11 +422,7 @@ export default function ZapisPage() {
         <>
             <div className="nav">
                 <Link className="brand" href="/start">
-                    <div className="logo">K</div>
-                    <div className="title">
-                        <strong>KopaMa – Panel</strong>
-                        <span>Zapis na kurs</span>
-                    </div>
+                    <Image src="/logo.png" alt="logo" height={100} width={200}/>
                 </Link>
 
                 <div className="nav-actions">
@@ -391,11 +438,11 @@ export default function ZapisPage() {
             <main className="hero">
                 <section className="shell">
                     <div className="hero-inner">
-                        <p className="kicker">Zakup kursu online</p>
+                        <h4 className="kicker">Zakup kursu online</h4>
                         <h1 className="headline">
                             Zapis na <span className="accent">kurs</span>
                         </h1>
-                        <p className="subline">Wypełnij formularz, a następnie przejdź do płatności Przelewy24.</p>
+                        <h4 className="subline">Wypełnij formularz, a następnie przejdź do płatności Przelewy24.</h4>
 
                         {loading ? (
                             <div className="wizPanel">
@@ -419,9 +466,9 @@ export default function ZapisPage() {
 
                                 {step === 1 && (
                                     <>
-                                        <p className="wizMeta" style={{ marginTop: 0 }}>
+                                        <h2 className="wizMeta" style={{ marginTop: 0 }}>
                                             Wybierz wariant kursu. Cena dotyczy płatności online.
-                                        </p>
+                                        </h2>
 
                                         <div className="offerGrid">
                                             {courseOffers.map((o) => {
@@ -516,13 +563,24 @@ export default function ZapisPage() {
 
                                         <div>
                                             <label>Termin rozpoczęcia kursu</label>
-                                            <input
-                                                type="date"
+                                            <select
                                                 value={form.courseStartDate}
                                                 onChange={(e) => set('courseStartDate', e.target.value)}
-                                                min={minCourseStartStr || undefined}
-                                                disabled={!minCourseStartStr}
-                                            />
+                                                disabled={!minCourseStartStr || filteredStartSlots.length === 0}
+                                            >
+                                                <option value="">Wybierz termin</option>
+                                                {filteredStartSlots.map((slot) => (
+                                                    <option key={slot.id} value={slot.startDate}>
+                                                        {new Date(slot.startDate).toLocaleDateString('pl-PL')}
+                                                    </option>
+                                                ))}
+                                            </select>
+
+                                            {filteredStartSlots.length === 0 ? (
+                                                <p style={{ marginTop: 8 }}>
+                                                    Brak dostępnych terminów dla wybranego kursu.
+                                                </p>
+                                            ) : null}
                                         </div>
                                         <div className="wizGrid2">
                                             <div>

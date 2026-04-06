@@ -8,4 +8,5 @@ export class CourseCategoriesController {
   list() {
     return this.service.list();
   }
+
 }
