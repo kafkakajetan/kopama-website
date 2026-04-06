@@ -90,6 +90,19 @@ function toDateInputValue(d: Date): string {
     return `${yyyy}-${mm}-${dd}`;
 }
 
+function slotDateToInputValue(value: string): string {
+    return value.slice(0, 10);
+}
+
+function formatCourseStartDateLabel(value: string): string {
+    return new Date(value).toLocaleDateString('pl-PL', {
+        weekday: 'long',
+        day: '2-digit',
+        month: 'long',
+        year: 'numeric',
+    });
+}
+
 function isMinorOnDate(birth: Date, on: Date): boolean {
     const adultAt = addMonths(birth, 18 * 12);
     return on.getTime() < adultAt.getTime();
@@ -221,8 +234,6 @@ export default function ZapisPage() {
                     offerItemCode: firstCourse.code,
                     courseCategoryId: firstCourse.courseCategory!.id,
                 }));
-
-                await loadStartSlots(firstCourse.code);
             } catch (e) {
                 setError(e instanceof Error ? e.message : 'Błąd pobierania danych');
             } finally {
@@ -238,14 +249,22 @@ export default function ZapisPage() {
         [courseOffers, form.offerItemCode],
     );
 
+    useEffect(() => {
+        if (!form.offerItemCode) {
+            setAvailableStartSlots([]);
+            return;
+        }
+
+        loadStartSlots(form.offerItemCode).catch((e) =>
+            setError(e instanceof Error ? e.message : 'Błąd pobierania terminów'),
+        );
+    }, [form.offerItemCode]);
+
     const filteredStartSlots = useMemo(() => {
         if (!minCourseStartStr) return availableStartSlots;
 
-        const minDate = new Date(minCourseStartStr).getTime();
-
         return availableStartSlots.filter((slot) => {
-            const slotDate = new Date(slot.startDate);
-            return slotDate.getTime() >= minDate;
+            return slotDateToInputValue(slot.startDate) >= minCourseStartStr;
         });
     }, [availableStartSlots, minCourseStartStr]);
 
@@ -267,8 +286,6 @@ export default function ZapisPage() {
             courseCategoryId: catId,
             courseStartDate: '',
         }));
-
-        void loadStartSlots(offer.code);
     };
 
     const loadStartSlots = async (offerItemCode: string) => {
@@ -548,36 +565,40 @@ export default function ZapisPage() {
                                                     max={toDateInputValue(new Date())}
                                                 />
                                             </div>
-
                                             <div>
                                                 <label>Tryb kursu</label>
-                                                <select
-                                                    value={form.courseMode}
-                                                    onChange={(e) => set('courseMode', e.target.value as 'STATIONARY' | 'ELEARNING')}
-                                                >
-                                                    <option value="STATIONARY">Kurs stacjonarny</option>
-                                                    <option value="ELEARNING">Kurs e-learning</option>
-                                                </select>
+                                                <div className="kpSelectWrap">
+                                                    <select
+                                                        className="kpSelect"
+                                                        value={form.courseMode}
+                                                        onChange={(e) => set('courseMode', e.target.value as 'STATIONARY' | 'ELEARNING')}
+                                                    >
+                                                        <option value="STATIONARY">Kurs stacjonarny</option>
+                                                        <option value="ELEARNING">Kurs e-learning</option>
+                                                    </select>
+                                                </div>
                                             </div>
                                         </div>
 
                                         <div>
                                             <label>Termin rozpoczęcia kursu</label>
-                                            <select
-                                                value={form.courseStartDate}
-                                                onChange={(e) => set('courseStartDate', e.target.value)}
-                                                disabled={!minCourseStartStr || filteredStartSlots.length === 0}
-                                            >
-                                                <option value="">Wybierz termin</option>
-                                                {filteredStartSlots.map((slot) => (
-                                                    <option key={slot.id} value={slot.startDate}>
-                                                        {new Date(slot.startDate).toLocaleDateString('pl-PL')}
-                                                    </option>
-                                                ))}
-                                            </select>
+                                            <div className="kpSelectWrap">
+                                                <select
+                                                    className="kpSelect"
+                                                    value={form.courseStartDate}
+                                                    onChange={(e) => set('courseStartDate', e.target.value)}
+                                                    disabled={!minCourseStartStr || filteredStartSlots.length === 0}
+                                                >
+                                                    {filteredStartSlots.map((slot) => (
+                                                        <option key={slot.id} value={slotDateToInputValue(slot.startDate)}>
+                                                            {new Date(slot.startDate).toLocaleDateString('pl-PL')}
+                                                        </option>
+                                                    ))}
+                                                </select>
+                                            </div>
 
                                             {filteredStartSlots.length === 0 ? (
-                                                <p style={{ marginTop: 8 }}>
+                                                <p className="kpSelectHint">
                                                     Brak dostępnych terminów dla wybranego kursu.
                                                 </p>
                                             ) : null}
