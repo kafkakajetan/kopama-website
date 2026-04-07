@@ -27,6 +27,11 @@ enum PaymentStatus {
   ERROR
 }
 
+enum OfferLanguage {
+  PL
+  EN
+}
+
 enum ContractStatus {
   NOT_GENERATED
   GENERATED
@@ -194,9 +199,10 @@ model OfferItem {
   unit     OfferUnit
   isActive Boolean   @default(true)
 
-  // opcjonalnie: jeśli usługa dotyczy konkretnej kategorii
   courseCategoryId String?
   courseCategory   CourseCategory? @relation(fields: [courseCategoryId], references: [id])
+
+  language OfferLanguage @default(PL)
 
   enrollments Enrollment[]
 
