@@ -22,6 +22,7 @@ type OfferItem = {
     id: string;
     code: string;
     name: string;
+    language: 'PL' | 'EN';
     type: 'COURSE' | 'EXTRA_HOUR' | 'EXAM_CAR' | 'TRAINING_PACKAGE' | 'OTHER';
     unit: 'PACKAGE' | 'HOUR' | 'SERVICE';
     isActive: boolean;
@@ -62,6 +63,8 @@ type CreateEnrollmentPayload = {
     acceptedPrivacy: boolean;
     acceptedSalesTerms: boolean;
 };
+
+type CourseLanguage = 'PL' | 'EN';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
@@ -156,6 +159,7 @@ export default function ZapisPage() {
     const [error, setError] = useState<string>('');
     const [enrollmentId, setEnrollmentId] = useState<string>('');
     const [mockPay, setMockPay] = useState<MockPayResult | null>(null);
+    const [courseLanguage, setCourseLanguage] = useState<CourseLanguage>('PL');
     type MockPayResult = {
         ok: true;
         enrollmentId: string;
@@ -167,8 +171,11 @@ export default function ZapisPage() {
 
     const [offers, setOffers] = useState<OfferItem[]>([]);
     const courseOffers = useMemo(
-        () => offers.filter((o) => o.isActive && o.type === 'COURSE'),
-        [offers],
+        () =>
+            offers.filter(
+                (o) => o.isActive && o.type === 'COURSE' && o.language === courseLanguage,
+            ),
+        [offers, courseLanguage],
     );
 
     const [availableStartSlots, setAvailableStartSlots] = useState<CourseStartSlot[]>([]);
@@ -225,7 +232,9 @@ export default function ZapisPage() {
                 const data = (await res.json()) as OfferItem[];
                 setOffers(data);
 
-                const firstCourse = data.find((o) => o.isActive && o.type === 'COURSE');
+                const firstCourse = data.find(
+                    (o) => o.isActive && o.type === 'COURSE' && o.language === 'PL',
+                );
                 if (!firstCourse) throw new Error('Brak aktywnych kursów w ofercie (OfferItem type=COURSE).');
                 if (!firstCourse.courseCategory?.id) throw new Error(`Kurs "${firstCourse.name}" nie ma przypisanej kategorii.`);
 
@@ -248,6 +257,31 @@ export default function ZapisPage() {
         () => courseOffers.find((o) => o.code === form.offerItemCode) ?? null,
         [courseOffers, form.offerItemCode],
     );
+
+    useEffect(() => {
+        if (courseOffers.length === 0) {
+            setForm((prev) => ({
+                ...prev,
+                offerItemCode: '',
+                courseCategoryId: '',
+                courseStartDate: '',
+            }));
+            return;
+        }
+
+        const selected = courseOffers.find((o) => o.code === form.offerItemCode);
+        if (selected?.courseCategory?.id) return;
+
+        const first = courseOffers[0];
+        if (!first.courseCategory?.id) return;
+
+        setForm((prev) => ({
+            ...prev,
+            offerItemCode: first.code,
+            courseCategoryId: first.courseCategory!.id,
+            courseStartDate: '',
+        }));
+    }, [courseOffers, form.offerItemCode]);
 
     useEffect(() => {
         if (!form.offerItemCode) {
@@ -503,6 +537,24 @@ export default function ZapisPage() {
                                         <h2 className="wizMeta" style={{ marginTop: 0 }}>
                                             Wybierz wariant kursu. Cena dotyczy płatności online.
                                         </h2>
+
+                                        <div style={{ display: 'flex', gap: 12, margin: '12px 0 20px' }}>
+                                            <button
+                                                type="button"
+                                                className={`pill ${courseLanguage === 'PL' ? 'navy' : 'beige'}`}
+                                                onClick={() => setCourseLanguage('PL')}
+                                            >
+                                                po polsku
+                                            </button>
+
+                                            <button
+                                                type="button"
+                                                className={`pill ${courseLanguage === 'EN' ? 'navy' : 'beige'}`}
+                                                onClick={() => setCourseLanguage('EN')}
+                                            >
+                                                in English
+                                            </button>
+                                        </div>
 
                                         <div className="offerGrid">
                                             {courseOffers.map((o) => {
