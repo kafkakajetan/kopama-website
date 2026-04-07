@@ -268,6 +268,23 @@ export default function ZapisPage() {
         });
     }, [availableStartSlots, minCourseStartStr]);
 
+    useEffect(() => {
+        const availableValues = filteredStartSlots.map((slot) =>
+            slotDateToInputValue(slot.startDate),
+        );
+
+        if (availableValues.length === 0) {
+            if (form.courseStartDate !== '') {
+                set('courseStartDate', '');
+            }
+            return;
+        }
+
+        if (!availableValues.includes(form.courseStartDate)) {
+            set('courseStartDate', '');
+        }
+    }, [filteredStartSlots, form.courseStartDate]);
+
     const set = <K extends keyof CreateEnrollmentPayload>(key: K, value: CreateEnrollmentPayload[K]) => {
         setForm((p) => ({ ...p, [key]: value }));
     };
@@ -587,8 +604,14 @@ export default function ZapisPage() {
                                                     className="kpSelect"
                                                     value={form.courseStartDate}
                                                     onChange={(e) => set('courseStartDate', e.target.value)}
-                                                    disabled={!minCourseStartStr || filteredStartSlots.length === 0}
+                                                    disabled={filteredStartSlots.length === 0}
                                                 >
+                                                    <option value="">
+                                                        {filteredStartSlots.length > 0
+                                                            ? 'Wybierz termin kursu'
+                                                            : 'Brak dostępnych terminów'}
+                                                    </option>
+
                                                     {filteredStartSlots.map((slot) => (
                                                         <option key={slot.id} value={slotDateToInputValue(slot.startDate)}>
                                                             {new Date(slot.startDate).toLocaleDateString('pl-PL')}
