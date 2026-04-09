@@ -73,7 +73,6 @@ model CourseCategory {
   enrollments Enrollment[]
   offerItems  OfferItem[]
   instructors  User[] @relation("InstructorSpecializations")
-  startSlots CourseStartSlot[]
 }
 
 model Enrollment {
@@ -207,6 +206,7 @@ model OfferItem {
   enrollments Enrollment[]
 
   priceRules PriceRule[]
+  courseStartSlots CourseStartSlot[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -232,16 +232,16 @@ model PriceRule {
 }
 
 model CourseStartSlot {
-  id               String         @id @default(cuid())
-  createdAt        DateTime       @default(now())
-  updatedAt        DateTime       @updatedAt
-  startDate        DateTime
-  isActive         Boolean        @default(true)
-  notes            String?
+  id          String    @id @default(cuid())
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  startDate   DateTime
+  isActive    Boolean   @default(true)
+  notes       String?
 
-  courseCategoryId String
-  courseCategory   CourseCategory @relation(fields: [courseCategoryId], references: [id], onDelete: Cascade)
+  offerItemId String
+  offerItem   OfferItem @relation(fields: [offerItemId], references: [id], onDelete: Cascade)
 
-  @@unique([courseCategoryId, startDate])
-  @@index([courseCategoryId, startDate, isActive])
+  @@unique([offerItemId, startDate])
+  @@index([offerItemId, startDate, isActive])
 }

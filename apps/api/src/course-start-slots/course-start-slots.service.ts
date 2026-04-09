@@ -19,20 +19,63 @@ function normalizeCourseStartDate(value: string): Date {
 export class CourseStartSlotsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async listForAdmin(courseCategoryId: string) {
-    if (!courseCategoryId) {
-      throw new BadRequestException('Brak courseCategoryId.');
+  async listForAdmin(offerItemId: string) {
+    if (!offerItemId) {
+      throw new BadRequestException('Brak offerItemId.');
     }
 
     return this.prisma.courseStartSlot.findMany({
-      where: { courseCategoryId },
+      where: { offerItemId },
       orderBy: { startDate: 'asc' },
       select: {
         id: true,
         startDate: true,
         isActive: true,
         notes: true,
-        courseCategoryId: true,
+        offerItemId: true,
+        offerItem: {
+          select: {
+            id: true,
+            code: true,
+            name: true,
+            language: true,
+            courseCategory: {
+              select: {
+                id: true,
+                code: true,
+                name: true,
+              },
+            },
+          },
+        },
+      },
+    });
+  }
+
+  async create(body: {
+    offerItemId?: string;
+    startDate?: string;
+    notes?: string;
+  }) {
+    const offerItemId = String(body.offerItemId ?? '').trim();
+    const startDateRaw = String(body.startDate ?? '').trim();
+    const notes = body.notes ? String(body.notes).trim() : null;
+
+    if (!offerItemId) {
+      throw new BadRequestException('Wybierz kurs.');
+    }
+
+    if (!startDateRaw) {
+      throw new BadRequestException('Wybierz termin rozpoczęcia kursu.');
+    }
+
+    const offerItem = await this.prisma.offerItem.findUnique({
+      where: { id: offerItemId },
+      select: {
+        id: true,
+        code: true,
+        name: true,
+        language: true,
         courseCategory: {
           select: {
             id: true,
@@ -42,40 +85,17 @@ export class CourseStartSlotsService {
         },
       },
     });
-  }
 
-  async create(body: {
-    courseCategoryId?: string;
-    startDate?: string;
-    notes?: string;
-  }) {
-    const courseCategoryId = String(body.courseCategoryId ?? '').trim();
-    const startDateRaw = String(body.startDate ?? '').trim();
-    const notes = body.notes ? String(body.notes).trim() : null;
-
-    if (!courseCategoryId) {
-      throw new BadRequestException('Wybierz kategorię kursu.');
-    }
-
-    if (!startDateRaw) {
-      throw new BadRequestException('Wybierz termin rozpoczęcia kursu.');
-    }
-
-    const courseCategory = await this.prisma.courseCategory.findUnique({
-      where: { id: courseCategoryId },
-      select: { id: true, code: true, name: true },
-    });
-
-    if (!courseCategory) {
-      throw new NotFoundException('Nie znaleziono kategorii kursu.');
+    if (!offerItem) {
+      throw new NotFoundException('Nie znaleziono oferty kursu.');
     }
 
     const startDate = normalizeCourseStartDate(startDateRaw);
 
     return this.prisma.courseStartSlot.upsert({
       where: {
-        courseCategoryId_startDate: {
-          courseCategoryId,
+        offerItemId_startDate: {
+          offerItemId,
           startDate,
         },
       },
@@ -84,7 +104,7 @@ export class CourseStartSlotsService {
         notes,
       },
       create: {
-        courseCategoryId,
+        offerItemId,
         startDate,
         isActive: true,
         notes,
@@ -94,12 +114,20 @@ export class CourseStartSlotsService {
         startDate: true,
         isActive: true,
         notes: true,
-        courseCategoryId: true,
-        courseCategory: {
+        offerItemId: true,
+        offerItem: {
           select: {
             id: true,
             code: true,
             name: true,
+            language: true,
+            courseCategory: {
+              select: {
+                id: true,
+                code: true,
+                name: true,
+              },
+            },
           },
         },
       },
@@ -135,24 +163,23 @@ export class CourseStartSlotsService {
       select: {
         id: true,
         code: true,
-        courseCategoryId: true,
       },
     });
 
-    if (!offer || !offer.courseCategoryId) {
+    if (!offer) {
       throw new NotFoundException('Nie znaleziono kursu.');
     }
 
     return this.prisma.courseStartSlot.findMany({
       where: {
-        courseCategoryId: offer.courseCategoryId,
+        offerItemId: offer.id,
         isActive: true,
       },
       orderBy: { startDate: 'asc' },
       select: {
         id: true,
         startDate: true,
-        courseCategoryId: true,
+        offerItemId: true,
       },
     });
   }

@@ -18,8 +18,8 @@ export class CourseStartSlotsController {
 
   @Get('admin/course-start-slots')
   @UseGuards(JwtCookieGuard, AdminGuard)
-  listForAdmin(@Query('courseCategoryId') courseCategoryId: string) {
-    return this.service.listForAdmin(courseCategoryId);
+  listForAdmin(@Query('offerItemId') offerItemId: string) {
+    return this.service.listForAdmin(offerItemId);
   }
 
   @Post('admin/course-start-slots')
@@ -27,7 +27,7 @@ export class CourseStartSlotsController {
   create(
     @Body()
     body: {
-      courseCategoryId?: string;
+      offerItemId?: string;
       startDate?: string;
       notes?: string;
     },
