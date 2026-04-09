@@ -12,10 +12,18 @@ type Me = {
     role: string;
 };
 
-type CourseCategory = {
+type OfferItem = {
     id: string;
     code: string;
     name: string;
+    language: 'PL' | 'EN';
+    type: 'COURSE' | 'EXTRA_HOUR' | 'EXAM_CAR' | 'TRAINING_PACKAGE' | 'OTHER';
+    isActive: boolean;
+    courseCategory?: {
+        id: string;
+        code: string;
+        name: string;
+    } | null;
 };
 
 type CourseStartSlot = {
@@ -23,28 +31,34 @@ type CourseStartSlot = {
     startDate: string;
     isActive: boolean;
     notes: string | null;
-    courseCategoryId: string;
-    courseCategory: {
+    offerItemId: string;
+    offerItem: {
         id: string;
         code: string;
         name: string;
+        language: 'PL' | 'EN';
+        courseCategory?: {
+            id: string;
+            code: string;
+            name: string;
+        } | null;
     };
 };
 
 export default function AdminCourseStartSlotsPage() {
     const router = useRouter();
 
-    const [categories, setCategories] = useState<CourseCategory[]>([]);
-    const [selectedCategoryId, setSelectedCategoryId] = useState('');
+    const [offers, setOffers] = useState<OfferItem[]>([]);
+    const [selectedOfferId, setSelectedOfferId] = useState('');
     const [startDate, setStartDate] = useState('');
     const [notes, setNotes] = useState('');
     const [slots, setSlots] = useState<CourseStartSlot[]>([]);
     const [error, setError] = useState('');
     const [ok, setOk] = useState('');
 
-    const selectedCategory = useMemo(
-        () => categories.find((item) => item.id === selectedCategoryId) ?? null,
-        [categories, selectedCategoryId],
+    const selectedOffer = useMemo(
+        () => offers.find((item) => item.id === selectedOfferId) ?? null,
+        [offers, selectedOfferId],
     );
 
     const load = async () => {
@@ -63,27 +77,31 @@ export default function AdminCourseStartSlotsPage() {
             return;
         }
 
-        const categoriesRes = await fetch(`${API_URL}/course-categories`, {
+        const offersRes = await fetch(`${API_URL}/offers`, {
             credentials: 'include',
         }).catch(() => null);
 
-        if (!categoriesRes || !categoriesRes.ok) {
-            throw new Error('Nie udało się pobrać kategorii kursów.');
+        if (!offersRes || !offersRes.ok) {
+            throw new Error('Nie udało się pobrać ofert kursów.');
         }
 
-        const categoriesData = (await categoriesRes.json()) as CourseCategory[];
-        setCategories(categoriesData);
+        const offersData = (await offersRes.json()) as OfferItem[];
+        const courseOffers = offersData.filter(
+            (offer) => offer.isActive && offer.type === 'COURSE',
+        );
 
-        if (!selectedCategoryId && categoriesData.length > 0) {
-            setSelectedCategoryId(categoriesData[0].id);
+        setOffers(courseOffers);
+
+        if (!selectedOfferId && courseOffers.length > 0) {
+            setSelectedOfferId(courseOffers[0].id);
         }
     };
 
-    const loadSlots = async (courseCategoryId: string) => {
-        if (!API_URL || !courseCategoryId) return;
+    const loadSlots = async (offerItemId: string) => {
+        if (!API_URL || !offerItemId) return;
 
         const res = await fetch(
-            `${API_URL}/admin/course-start-slots?courseCategoryId=${encodeURIComponent(courseCategoryId)}`,
+            `${API_URL}/admin/course-start-slots?offerItemId=${encodeURIComponent(offerItemId)}`,
             { credentials: 'include' },
         );
 
@@ -100,19 +118,19 @@ export default function AdminCourseStartSlotsPage() {
     }, []);
 
     useEffect(() => {
-        if (!selectedCategoryId) return;
-        loadSlots(selectedCategoryId).catch((e) =>
+        if (!selectedOfferId) return;
+        loadSlots(selectedOfferId).catch((e) =>
             setError(e instanceof Error ? e.message : 'Błąd'),
         );
-    }, [selectedCategoryId]);
+    }, [selectedOfferId]);
 
     const addSlot = async () => {
         try {
             setError('');
             setOk('');
 
-            if (!selectedCategoryId) {
-                setError('Wybierz kategorię kursu.');
+            if (!selectedOfferId) {
+                setError('Wybierz kurs.');
                 return;
             }
 
@@ -128,7 +146,7 @@ export default function AdminCourseStartSlotsPage() {
                 headers: { 'Content-Type': 'application/json' },
                 credentials: 'include',
                 body: JSON.stringify({
-                    courseCategoryId: selectedCategoryId,
+                    offerItemId: selectedOfferId,
                     startDate,
                     notes: notes.trim() || undefined,
                 }),
@@ -143,7 +161,7 @@ export default function AdminCourseStartSlotsPage() {
             setStartDate('');
             setNotes('');
             setOk('Termin został zapisany.');
-            await loadSlots(selectedCategoryId);
+            await loadSlots(selectedOfferId);
         } catch (e) {
             setError(e instanceof Error ? e.message : 'Błąd zapisu terminu');
         }
@@ -166,7 +184,7 @@ export default function AdminCourseStartSlotsPage() {
             }
 
             setOk('Termin został usunięty.');
-            await loadSlots(selectedCategoryId);
+            await loadSlots(selectedOfferId);
         } catch (e) {
             setError(e instanceof Error ? e.message : 'Błąd usuwania terminu');
         }
@@ -192,15 +210,16 @@ export default function AdminCourseStartSlotsPage() {
                     </div>
                 ) : null}
 
-                <label>Kategoria kursu</label>
+                <label>Kurs</label>
                 <select
-                    value={selectedCategoryId}
-                    onChange={(e) => setSelectedCategoryId(e.target.value)}
+                    value={selectedOfferId}
+                    onChange={(e) => setSelectedOfferId(e.target.value)}
                 >
-                    <option value="">Wybierz kategorię</option>
-                    {categories.map((category) => (
-                        <option key={category.id} value={category.id}>
-                            {category.name} ({category.code})
+                    <option value="">Wybierz kurs</option>
+                    {offers.map((offer) => (
+                        <option key={offer.id} value={offer.id}>
+                            {offer.name} [{offer.language}]
+                            {offer.courseCategory ? ` — ${offer.courseCategory.name}` : ''}
                         </option>
                     ))}
                 </select>
@@ -229,9 +248,9 @@ export default function AdminCourseStartSlotsPage() {
             <section className="formcard active">
                 <h2>Dostępne terminy</h2>
                 <p>
-                    {selectedCategory
-                        ? `Lista terminów dla: ${selectedCategory.name}`
-                        : 'Wybierz kategorię kursu.'}
+                    {selectedOffer
+                        ? `Lista terminów dla: ${selectedOffer.name} [${selectedOffer.language}]`
+                        : 'Wybierz kurs.'}
                 </p>
 
                 <div style={{ display: 'grid', gap: 12 }}>
@@ -248,7 +267,11 @@ export default function AdminCourseStartSlotsPage() {
                                 {new Date(slot.startDate).toLocaleDateString('pl-PL')}
                             </div>
 
-                            <div style={{ opacity: 0.85, marginBottom: 10 }}>
+                            <div style={{ opacity: 0.85, marginBottom: 6 }}>
+                                {slot.offerItem.name} [{slot.offerItem.language}]
+                            </div>
+
+                            <div style={{ opacity: 0.7, marginBottom: 10 }}>
                                 {slot.notes || 'Brak notatki'}
                             </div>
 
@@ -263,7 +286,7 @@ export default function AdminCourseStartSlotsPage() {
                         </div>
                     ))}
 
-                    {slots.length === 0 ? <p>Brak terminów dla wybranej kategorii.</p> : null}
+                    {slots.length === 0 ? <p>Brak terminów dla wybranego kursu.</p> : null}
                 </div>
             </section>
         </div>

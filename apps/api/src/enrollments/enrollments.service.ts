@@ -145,7 +145,7 @@ export class EnrollmentsService {
 
     const availableStartSlot = await this.prisma.courseStartSlot.findFirst({
       where: {
-        courseCategoryId: offer.courseCategoryId,
+        offerItemId: offer.id,
         startDate: courseStartDate,
         isActive: true,
       },
