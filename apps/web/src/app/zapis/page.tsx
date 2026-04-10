@@ -459,7 +459,6 @@ export default function ZapisPage() {
 
             const payload: Record<string, unknown> = {
                 ...form,
-                courseStartDate: isElearning ? undefined : form.courseStartDate,
                 hasOtherDrivingLicense: isBAfterB1 || form.hasOtherDrivingLicense,
                 otherDrivingLicenseCategory: isBAfterB1
                     ? 'B1'
@@ -473,6 +472,10 @@ export default function ZapisPage() {
 
             if (isElearning) {
                 delete payload.courseStartDate;
+            }
+
+            if (!isElearning) {
+                payload.courseStartDate = form.courseStartDate;
             }
 
             if (!isBAfterB1 && !form.hasOtherDrivingLicense) {
