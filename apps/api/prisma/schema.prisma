@@ -92,7 +92,7 @@ model Enrollment {
 
   birthDate       DateTime
   courseMode      CourseMode
-  courseStartDate DateTime
+  courseStartDate DateTime?
 
   hasOtherDrivingLicense      Boolean @default(false)
   otherDrivingLicenseCategory String?

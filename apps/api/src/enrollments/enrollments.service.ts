@@ -75,11 +75,26 @@ export class EnrollmentsService {
       );
     }
 
+    const isElearning = dto.courseMode === 'ELEARNING';
     const minCourseStartAt = addMonths(birthDate, 16 * 12 + 9);
-    const courseStartDate =
-      this.courseStartSlotsService.normalizeCourseStartDate(
+
+    let courseStartDate: Date | null = null;
+
+    if (!isElearning) {
+      courseStartDate = this.courseStartSlotsService.normalizeCourseStartDate(
         dto.courseStartDate,
       );
+
+      if (Number.isNaN(courseStartDate.getTime())) {
+        throw new BadRequestException('Nieprawidłowy termin kursu.');
+      }
+
+      if (isBefore(courseStartDate, minCourseStartAt)) {
+        throw new BadRequestException(
+          'Termin kursu musi przypadać najwcześniej w dniu ukończenia 16 lat i 9 miesięcy.',
+        );
+      }
+    }
 
     if (Number.isNaN(courseStartDate.getTime())) {
       throw new BadRequestException('Nieprawidłowy termin kursu.');
@@ -123,14 +138,6 @@ export class EnrollmentsService {
       }
     }
 
-    if (dto.hasOtherDrivingLicense) {
-      if (!dto.otherDrivingLicenseCategory || !dto.otherDrivingLicenseNumber) {
-        throw new BadRequestException(
-          'Jeśli kursant posiada prawo jazdy innej kategorii, wymagane są kategoria i numer prawa jazdy.',
-        );
-      }
-    }
-
     if (dto.hasTramPermit) {
       if (!dto.tramPermitNumber) {
         throw new BadRequestException(
@@ -159,17 +166,38 @@ export class EnrollmentsService {
       );
     }
 
-    const availableStartSlot = await this.prisma.courseStartSlot.findFirst({
-      where: {
-        offerItemId: offer.id,
-        startDate: courseStartDate,
-        isActive: true,
-      },
-      select: { id: true },
-    });
+    const isBAfterB1 = offer.courseCategory?.code === 'B_AFTER_B1';
+    const hasOtherDrivingLicense = isBAfterB1 || dto.hasOtherDrivingLicense;
 
-    if (!availableStartSlot) {
-      throw new BadRequestException('Wybrany termin kursu nie jest dostępny.');
+    if (isBAfterB1) {
+      if (!dto.otherDrivingLicenseNumber?.trim()) {
+        throw new BadRequestException(
+          'Dla kursu Kat. B po B1 wymagany jest numer prawa jazdy kategorii B1.',
+        );
+      }
+    } else if (dto.hasOtherDrivingLicense) {
+      if (!dto.otherDrivingLicenseCategory || !dto.otherDrivingLicenseNumber) {
+        throw new BadRequestException(
+          'Jeśli kursant posiada prawo jazdy innej kategorii, wymagane są kategoria i numer prawa jazdy.',
+        );
+      }
+    }
+
+    if (!isElearning) {
+      const availableStartSlot = await this.prisma.courseStartSlot.findFirst({
+        where: {
+          offerItemId: offer.id,
+          startDate: courseStartDate!,
+          isActive: true,
+        },
+        select: { id: true },
+      });
+
+      if (!availableStartSlot) {
+        throw new BadRequestException(
+          'Wybrany termin kursu nie jest dostępny.',
+        );
+      }
     }
 
     const guardianSameAddress = dto.guardianSameAddress === true;
@@ -196,11 +224,13 @@ export class EnrollmentsService {
         courseMode: dto.courseMode,
         courseStartDate,
 
-        hasOtherDrivingLicense: dto.hasOtherDrivingLicense,
-        otherDrivingLicenseCategory: dto.hasOtherDrivingLicense
-          ? (dto.otherDrivingLicenseCategory ?? null)
+        hasOtherDrivingLicense: hasOtherDrivingLicense,
+        otherDrivingLicenseCategory: hasOtherDrivingLicense
+          ? isBAfterB1
+            ? 'B1'
+            : (dto.otherDrivingLicenseCategory ?? null)
           : null,
-        otherDrivingLicenseNumber: dto.hasOtherDrivingLicense
+        otherDrivingLicenseNumber: hasOtherDrivingLicense
           ? (dto.otherDrivingLicenseNumber ?? null)
           : null,
 

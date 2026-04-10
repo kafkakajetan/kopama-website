@@ -277,6 +277,11 @@ export default function ZapisPage() {
         [courseOffers, form.offerItemCode],
     );
 
+    const isElearning = form.courseMode === 'ELEARNING';
+    const isBAfterB1 = selectedOffer?.courseCategory?.code === 'B_AFTER_B1';
+    const shouldShowOtherDrivingLicenseFields =
+        isBAfterB1 || form.hasOtherDrivingLicense;
+
     useEffect(() => {
         if (courseOffers.length === 0) {
             setForm((prev) => ({
@@ -338,6 +343,12 @@ export default function ZapisPage() {
         }
     }, [filteredStartSlots, form.courseStartDate]);
 
+    useEffect(() => {
+        if (isElearning && form.courseStartDate) {
+            set('courseStartDate', '');
+        }
+    }, [isElearning, form.courseStartDate]);
+
     const set = <K extends keyof CreateEnrollmentPayload>(key: K, value: CreateEnrollmentPayload[K]) => {
         setForm((p) => ({ ...p, [key]: value }));
     };
@@ -389,7 +400,9 @@ export default function ZapisPage() {
             if (!/^\+48\d{9}$/.test(form.phone)) return 'Telefon musi mieć format +48 i 9 cyfr.';
             if (!/^\d{11}$/.test(form.pesel)) return 'PESEL musi mieć 11 cyfr.';
             if (!/^\d{2}-\d{3}$/.test(form.postalCode)) return 'Kod pocztowy musi mieć format 00-000.';
-            if (!form.courseStartDate) return 'Wybierz termin rozpoczęcia kursu.';
+            if (!isElearning && !form.courseStartDate) {
+                return 'Wybierz termin rozpoczęcia kursu.';
+            }
             if (!/^[A-Za-zĄąĆćĘęŁłŃńÓóŚśŹźŻż \-]{2,}$/.test(form.city)) return 'Nieprawidłowa nazwa miasta.';
             if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(form.email)) return 'Podaj poprawny adres e-mail.';
             if (!form.addressLine1 || !form.city || !form.postalCode) return 'Uzupełnij adres.';
@@ -446,15 +459,23 @@ export default function ZapisPage() {
 
             const payload: Record<string, unknown> = {
                 ...form,
+                courseStartDate: isElearning ? undefined : form.courseStartDate,
+                hasOtherDrivingLicense: isBAfterB1 || form.hasOtherDrivingLicense,
+                otherDrivingLicenseCategory: isBAfterB1
+                    ? 'B1'
+                    : form.otherDrivingLicenseCategory.trim().toUpperCase(),
+                otherDrivingLicenseNumber: form.otherDrivingLicenseNumber.trim(),
+                tramPermitNumber: form.tramPermitNumber.trim(),
                 pesel: digitsOnly(form.pesel).slice(0, 11),
                 email: sanitizeEmail(form.email),
                 postalCode: formatPostalCode(form.postalCode),
-                otherDrivingLicenseCategory: form.otherDrivingLicenseCategory.trim().toUpperCase(),
-                otherDrivingLicenseNumber: form.otherDrivingLicenseNumber.trim(),
-                tramPermitNumber: form.tramPermitNumber.trim(),
             };
 
-            if (!form.hasOtherDrivingLicense) {
+            if (isElearning) {
+                delete payload.courseStartDate;
+            }
+
+            if (!isBAfterB1 && !form.hasOtherDrivingLicense) {
                 delete payload.otherDrivingLicenseCategory;
                 delete payload.otherDrivingLicenseNumber;
             }
@@ -718,19 +739,25 @@ export default function ZapisPage() {
                                                     className="kpSelect"
                                                     value={form.courseStartDate}
                                                     onChange={(e) => set('courseStartDate', e.target.value)}
-                                                    disabled={filteredStartSlots.length === 0}
+                                                    disabled={isElearning || filteredStartSlots.length === 0}
                                                 >
                                                     <option value="">
-                                                        {filteredStartSlots.length > 0
-                                                            ? 'Wybierz termin kursu'
-                                                            : 'Brak dostępnych terminów'}
+                                                        {isElearning
+                                                            ? 'Termin nie dotyczy kursu e-learning'
+                                                            : filteredStartSlots.length > 0
+                                                                ? 'Wybierz termin kursu'
+                                                                : 'Brak dostępnych terminów'}
                                                     </option>
 
-                                                    {filteredStartSlots.map((slot) => (
-                                                        <option key={slot.id} value={slotDateToInputValue(slot.startDate)}>
-                                                            {new Date(slot.startDate).toLocaleDateString('pl-PL')}
-                                                        </option>
-                                                    ))}
+                                                    {isElearning ? (
+                                                        <p className="kpSelectHint">
+                                                            Dla kursu e-learning termin rozpoczęcia nie jest wymagany na tym etapie.
+                                                        </p>
+                                                    ) : filteredStartSlots.length === 0 ? (
+                                                        <p className="kpSelectHint">
+                                                            Brak dostępnych terminów dla wybranego kursu.
+                                                        </p>
+                                                    ) : null}
                                                 </select>
                                             </div>
 
@@ -796,7 +823,8 @@ export default function ZapisPage() {
                                             <label className="check" style={{ margin: 0 }}>
                                                 <input
                                                     type="checkbox"
-                                                    checked={form.hasOtherDrivingLicense}
+                                                    checked={isBAfterB1 || form.hasOtherDrivingLicense}
+                                                    disabled={isBAfterB1}
                                                     onChange={(e) => {
                                                         const checked = e.target.checked;
                                                         set('hasOtherDrivingLicense', checked);
@@ -806,7 +834,12 @@ export default function ZapisPage() {
                                                         }
                                                     }}
                                                 />
-                                                Posiadam już prawo jazdy innej kategorii
+                                                {isBAfterB1
+                                                    ? 'Posiadam już prawo jazdy kategorii B1'
+                                                    : 'Posiadam już prawo jazdy innej kategorii'}
+                                                {!isBAfterB1 && (
+                                                    <span style={{ marginLeft: 6, color: '#8a8a8a' }}>(opcjonalnie)</span>
+                                                )}
                                             </label>
 
                                             <label className="check" style={{ margin: 0 }}>
@@ -822,21 +855,25 @@ export default function ZapisPage() {
                                                     }}
                                                 />
                                                 Posiadam uprawnienia do kierowania tramwajem
+                                                {!isBAfterB1 && (
+                                                    <span style={{ marginLeft: 6, color: '#8a8a8a' }}>(opcjonalnie)</span>
+                                                )}
                                             </label>
                                         </div>
 
-                                        {form.hasOtherDrivingLicense && (
+                                        {shouldShowOtherDrivingLicenseFields && (
                                             <div className="wizGrid2" style={{ marginTop: 10 }}>
                                                 <div>
                                                     <label>Kategoria posiadanego prawa jazdy</label>
                                                     <input
-                                                        value={form.otherDrivingLicenseCategory}
+                                                        value={isBAfterB1 ? 'B1' : form.otherDrivingLicenseCategory}
                                                         onChange={(e) => set('otherDrivingLicenseCategory', e.target.value.toUpperCase())}
                                                         placeholder="np. B, C, D"
+                                                        disabled={isBAfterB1}
                                                     />
                                                 </div>
                                                 <div>
-                                                    <label>Numer prawa jazdy</label>
+                                                    <label>{isBAfterB1 ? 'Numer prawa jazdy kategorii B1' : 'Numer prawa jazdy'}</label>
                                                     <input
                                                         value={form.otherDrivingLicenseNumber}
                                                         onChange={(e) => set('otherDrivingLicenseNumber', e.target.value)}
@@ -857,8 +894,24 @@ export default function ZapisPage() {
                                             </div>
                                         )}
 
-                                        <div style={{ marginTop: 10 }}>
-                                            <label className="check" style={{ margin: 0 }}>
+                                        <div
+                                            style={{
+                                                marginTop: 14,
+                                                display: 'grid',
+                                                gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
+                                                gap: 12,
+                                            }}
+                                        >
+                                            <label
+                                                className="check"
+                                                style={{
+                                                    margin: 0,
+                                                    border: '1px solid #d32f2f',
+                                                    borderRadius: 12,
+                                                    padding: '12px 14px',
+                                                    background: '#fff5f5',
+                                                }}
+                                            >
                                                 <input
                                                     type="checkbox"
                                                     checked={form.acceptedTerms}
@@ -867,7 +920,16 @@ export default function ZapisPage() {
                                                 Akceptuję regulamin
                                             </label>
 
-                                            <label className="check" style={{ margin: '10px 0 0' }}>
+                                            <label
+                                                className="check"
+                                                style={{
+                                                    margin: 0,
+                                                    border: '1px solid #d32f2f',
+                                                    borderRadius: 12,
+                                                    padding: '12px 14px',
+                                                    background: '#fff5f5',
+                                                }}
+                                            >
                                                 <input
                                                     type="checkbox"
                                                     checked={form.acceptedPrivacy}

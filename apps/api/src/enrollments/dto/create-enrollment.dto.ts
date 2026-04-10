@@ -96,8 +96,14 @@ export class CreateEnrollmentDto {
   @IsEnum(CourseMode)
   courseMode!: CourseMode;
 
+  @IsOptional()
+  @Transform((p: TransformFnParams) => {
+    if (typeof p.value !== 'string') return undefined;
+    const value = p.value.trim();
+    return value === '' ? undefined : value;
+  })
   @IsDateString()
-  courseStartDate!: string;
+  courseStartDate?: string;
 
   @IsBoolean()
   hasOtherDrivingLicense!: boolean;
