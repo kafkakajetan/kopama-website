@@ -5,6 +5,24 @@ import {useEffect, useState} from "react";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
+type Me = {
+    role: 'ADMIN' | 'STUDENT' | 'INSTRUCTOR';
+};
+
+type Student = {
+    id: string;
+    createdAt: string;
+    firstName: string;
+    lastName: string;
+    email: string;
+    phone: string | null;
+    status: 'DRAFT' | 'PAYMENT_PENDING' | 'PAID' | 'CANCELED';
+    wantsCashPayment: boolean;
+    courseCategory: {
+        name: string;
+    } | null;
+};
+
 export default function AdminStudentsPage() {
 
     const router = useRouter();
@@ -112,19 +130,22 @@ export default function AdminStudentsPage() {
     }, [router]);
 
     return (
-        <div className="forms" style={{ gridTemplateColumns: '1fr', gap: 24 }}>
+        <div className="forms" style={{gridTemplateColumns: '1fr', gap: 24}}>
             <section className="formcard active">
                 <h2>Kursanci</h2>
                 <p>Liczba kont kursantów: {students.length}</p>
 
-                <div style={{ overflowX: 'auto' }}>
-                    <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <div style={{overflowX: 'auto'}}>
+                    <table style={{width: '100%', borderCollapse: 'collapse'}}>
                         <thead>
                         <tr>
-                            <th style={{ textAlign: 'left', padding: '10px 8px' }}>Data</th>
-                            <th style={{ textAlign: 'left', padding: '10px 8px' }}>Email</th>
-                            <th style={{ textAlign: 'left', padding: '10px 8px' }}>Telefon</th>
-                            <th style={{ textAlign: 'left', padding: '10px 8px' }}>Rola</th>
+                            <th style={{textAlign: 'left', padding: '10px 8px'}}>Data</th>
+                            <th style={{textAlign: 'left', padding: '10px 8px'}}>Imię</th>
+                            <th style={{textAlign: 'left', padding: '10px 8px'}}>Nazwisko</th>
+                            <th style={{textAlign: 'left', padding: '10px 8px'}}>Kategoria kursu</th>
+                            <th style={{textAlign: 'left', padding: '10px 8px'}}>Telefon</th>
+                            <th style={{textAlign: 'left', padding: '10px 8px'}}>Mail</th>
+                            <th style={{textAlign: 'left', padding: '10px 8px'}}>Status płatności</th>
                         </tr>
                         </thead>
                         <tbody>
@@ -138,29 +159,43 @@ export default function AdminStudentsPage() {
                                 >
                                     {new Date(student.createdAt).toLocaleString('pl-PL')}
                                 </td>
-                                <td
-                                    style={{
-                                        padding: '10px 8px',
-                                        borderTop: '1px solid rgba(255,255,255,.12)',
-                                    }}
-                                >
-                                    {student.email}
+                                <td style={{padding: '10px 8px', borderTop: '1px solid rgba(255,255,255,.12)'}}>
+                                    {student.firstName}
                                 </td>
-                                <td
-                                    style={{
-                                        padding: '10px 8px',
-                                        borderTop: '1px solid rgba(255,255,255,.12)',
-                                    }}
-                                >
+                                <td style={{padding: '10px 8px', borderTop: '1px solid rgba(255,255,255,.12)'}}>
+                                    {student.lastName}
+                                </td>
+                                <td style={{padding: '10px 8px', borderTop: '1px solid rgba(255,255,255,.12)'}}>
+                                    {student.courseCategory?.name ?? '—'}
+                                </td>
+                                <td style={{padding: '10px 8px', borderTop: '1px solid rgba(255,255,255,.12)'}}>
                                     {student.phone ?? '—'}
                                 </td>
-                                <td
-                                    style={{
-                                        padding: '10px 8px',
-                                        borderTop: '1px solid rgba(255,255,255,.12)',
-                                    }}
-                                >
-                                    {student.role}
+                                <td style={{padding: '10px 8px', borderTop: '1px solid rgba(255,255,255,.12)'}}>
+                                    {student.email}
+                                </td>
+                                <td style={{padding: '10px 8px', borderTop: '1px solid rgba(255,255,255,.12)'}}>
+                                    <span
+                                        style={{
+                                            display: 'inline-block',
+                                            padding: '6px 10px',
+                                            borderRadius: 999,
+                                            fontWeight: 700,
+                                            color: student.status === 'PAID'
+                                                ? '#166534'
+                                                : student.wantsCashPayment
+                                                    ? '#b42318'
+                                                    : '#b54708',
+                                            background:
+                                                student.status === 'PAID'
+                                                    ? '#dcfce7'
+                                                    : student.wantsCashPayment
+                                                        ? '#fee4e2'
+                                                        : '#ffedd5',
+                                        }}
+                                    >
+                                        {student.status === 'PAID' ? 'OPŁACONY' : 'TRWA'}
+                                    </span>
                                 </td>
                             </tr>
                         ))}
@@ -168,7 +203,7 @@ export default function AdminStudentsPage() {
                         {students.length === 0 ? (
                             <tr>
                                 <td
-                                    colSpan={4}
+                                    colSpan={7}
                                     style={{
                                         padding: '12px 8px',
                                         borderTop: '1px solid rgba(255,255,255,.12)',

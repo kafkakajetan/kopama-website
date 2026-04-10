@@ -151,15 +151,22 @@ export class AdminService {
   }
 
   async listStudents() {
-    return this.prisma.user.findMany({
-      where: { role: 'STUDENT' },
+    return this.prisma.enrollment.findMany({
       orderBy: { createdAt: 'desc' },
       select: {
         id: true,
         createdAt: true,
+        firstName: true,
+        lastName: true,
         email: true,
         phone: true,
-        role: true,
+        status: true,
+        wantsCashPayment: true,
+        courseCategory: {
+          select: {
+            name: true,
+          },
+        },
       },
     });
   }
