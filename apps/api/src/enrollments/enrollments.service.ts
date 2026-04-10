@@ -81,29 +81,26 @@ export class EnrollmentsService {
     let courseStartDate: Date | null = null;
 
     if (!isElearning) {
-      courseStartDate = this.courseStartSlotsService.normalizeCourseStartDate(
-        dto.courseStartDate,
-      );
+      if (!dto.courseStartDate) {
+        throw new BadRequestException('Wybierz termin kursu.');
+      }
 
-      if (Number.isNaN(courseStartDate.getTime())) {
+      const normalizedCourseStartDate =
+        this.courseStartSlotsService.normalizeCourseStartDate(
+          dto.courseStartDate,
+        );
+
+      if (Number.isNaN(normalizedCourseStartDate.getTime())) {
         throw new BadRequestException('Nieprawidłowy termin kursu.');
       }
 
-      if (isBefore(courseStartDate, minCourseStartAt)) {
+      if (isBefore(normalizedCourseStartDate, minCourseStartAt)) {
         throw new BadRequestException(
           'Termin kursu musi przypadać najwcześniej w dniu ukończenia 16 lat i 9 miesięcy.',
         );
       }
-    }
 
-    if (Number.isNaN(courseStartDate.getTime())) {
-      throw new BadRequestException('Nieprawidłowy termin kursu.');
-    }
-
-    if (isBefore(courseStartDate, minCourseStartAt)) {
-      throw new BadRequestException(
-        'Termin kursu musi przypadać najwcześniej w dniu ukończenia 16 lat i 9 miesięcy.',
-      );
+      courseStartDate = normalizedCourseStartDate;
     }
 
     const adultAtPurchase = !isBefore(now, addMonths(birthDate, 18 * 12));
