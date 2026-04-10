@@ -123,6 +123,22 @@ export class EnrollmentsService {
       }
     }
 
+    if (dto.hasOtherDrivingLicense) {
+      if (!dto.otherDrivingLicenseCategory || !dto.otherDrivingLicenseNumber) {
+        throw new BadRequestException(
+          'Jeśli kursant posiada prawo jazdy innej kategorii, wymagane są kategoria i numer prawa jazdy.',
+        );
+      }
+    }
+
+    if (dto.hasTramPermit) {
+      if (!dto.tramPermitNumber) {
+        throw new BadRequestException(
+          'Jeśli kursant posiada uprawnienia do kierowania tramwajem, wymagany jest numer uprawnień.',
+        );
+      }
+    }
+
     const offer = await this.prisma.offerItem.findUnique({
       where: { code: dto.offerItemCode },
       include: { courseCategory: true },
@@ -179,6 +195,22 @@ export class EnrollmentsService {
         birthDate,
         courseMode: dto.courseMode,
         courseStartDate,
+
+        hasOtherDrivingLicense: dto.hasOtherDrivingLicense,
+        otherDrivingLicenseCategory: dto.hasOtherDrivingLicense
+          ? (dto.otherDrivingLicenseCategory ?? null)
+          : null,
+        otherDrivingLicenseNumber: dto.hasOtherDrivingLicense
+          ? (dto.otherDrivingLicenseNumber ?? null)
+          : null,
+
+        hasTramPermit: dto.hasTramPermit,
+        tramPermitNumber: dto.hasTramPermit
+          ? (dto.tramPermitNumber ?? null)
+          : null,
+
+        wantsCashPayment: dto.wantsCashPayment,
+
         isMinorAtPurchase: isMinor,
 
         guardianSameAddress,

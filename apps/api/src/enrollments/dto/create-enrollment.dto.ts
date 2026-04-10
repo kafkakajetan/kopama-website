@@ -1,7 +1,9 @@
 import { Transform, type TransformFnParams } from 'class-transformer';
 import {
   IsBoolean,
+  IsDateString,
   IsEmail,
+  IsEnum,
   IsNotEmpty,
   IsOptional,
   IsString,
@@ -10,8 +12,8 @@ import {
   MinLength,
 } from 'class-validator';
 import { IsPesel } from '../validators/pesel.validator';
+import { CourseMode } from '@prisma/client';
 import { normalizePlPhoneToE164 } from '../transformers/phone.transform';
-import { IsDateString, IsEnum } from 'class-validator';
 
 function trimString(p: TransformFnParams): string {
   return typeof p.value === 'string' ? p.value.trim() : '';
@@ -38,7 +40,6 @@ export class CreateEnrollmentDto {
   @Transform((p: TransformFnParams) => normalizePlPhoneToE164(p.value))
   @IsString()
   @MaxLength(16)
-  // na start: tylko PL (+48 + 9 cyfr)
   @Matches(/^\+48\d{9}$/)
   phone!: string;
 
@@ -92,11 +93,40 @@ export class CreateEnrollmentDto {
   @IsDateString()
   birthDate!: string;
 
-  @IsEnum(['STATIONARY', 'ELEARNING'])
-  courseMode!: 'STATIONARY' | 'ELEARNING';
+  @IsEnum(CourseMode)
+  courseMode!: CourseMode;
 
   @IsDateString()
   courseStartDate!: string;
+
+  @IsBoolean()
+  hasOtherDrivingLicense!: boolean;
+
+  @IsOptional()
+  @Transform((p: TransformFnParams) =>
+    typeof p.value === 'string' ? p.value.trim().toUpperCase() : '',
+  )
+  @IsString()
+  @MaxLength(20)
+  otherDrivingLicenseCategory?: string;
+
+  @IsOptional()
+  @Transform((p: TransformFnParams) => trimString(p))
+  @IsString()
+  @MaxLength(64)
+  otherDrivingLicenseNumber?: string;
+
+  @IsBoolean()
+  hasTramPermit!: boolean;
+
+  @IsOptional()
+  @Transform((p: TransformFnParams) => trimString(p))
+  @IsString()
+  @MaxLength(64)
+  tramPermitNumber?: string;
+
+  @IsBoolean()
+  wantsCashPayment!: boolean;
 
   @IsOptional()
   @IsBoolean()

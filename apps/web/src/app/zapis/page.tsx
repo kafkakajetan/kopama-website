@@ -48,6 +48,15 @@ type CreateEnrollmentPayload = {
     courseMode: 'STATIONARY' | 'ELEARNING';
     courseStartDate: string;
 
+    hasOtherDrivingLicense: boolean;
+    otherDrivingLicenseCategory: string;
+    otherDrivingLicenseNumber: string;
+
+    hasTramPermit: boolean;
+    tramPermitNumber: string;
+
+    wantsCashPayment: boolean;
+
     guardianSameAddress: boolean;
 
     guardianPesel: string;
@@ -65,6 +74,15 @@ type CreateEnrollmentPayload = {
 };
 
 type CourseLanguage = 'PL' | 'EN';
+
+type MockPayResult = {
+    ok: true;
+    enrollmentId: string;
+    email: string;
+    userCreated: boolean;
+    tempPassword?: string;
+    contractKey: string;
+};
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
@@ -160,14 +178,6 @@ export default function ZapisPage() {
     const [enrollmentId, setEnrollmentId] = useState<string>('');
     const [mockPay, setMockPay] = useState<MockPayResult | null>(null);
     const [courseLanguage, setCourseLanguage] = useState<CourseLanguage>('PL');
-    type MockPayResult = {
-        ok: true;
-        enrollmentId: string;
-        email: string;
-        userCreated: boolean;
-        tempPassword?: string;
-        contractKey: string;
-    };
 
     const [offers, setOffers] = useState<OfferItem[]>([]);
     const courseOffers = useMemo(
@@ -199,6 +209,15 @@ export default function ZapisPage() {
         birthDate: '',
         courseMode: 'STATIONARY',
         courseStartDate: '',
+
+        hasOtherDrivingLicense: false,
+        otherDrivingLicenseCategory: '',
+        otherDrivingLicenseNumber: '',
+
+        hasTramPermit: false,
+        tramPermitNumber: '',
+
+        wantsCashPayment: false,
 
         guardianSameAddress: false,
         guardianPesel: '',
@@ -364,6 +383,7 @@ export default function ZapisPage() {
             if (!form.offerItemCode) return 'Wybierz kurs.';
             return null;
         }
+
         if (s === 2) {
             if (!form.firstName || !form.lastName) return 'Uzupełnij imię i nazwisko.';
             if (!/^\+48\d{9}$/.test(form.phone)) return 'Telefon musi mieć format +48 i 9 cyfr.';
@@ -373,13 +393,34 @@ export default function ZapisPage() {
             if (!/^[A-Za-zĄąĆćĘęŁłŃńÓóŚśŹźŻż \-]{2,}$/.test(form.city)) return 'Nieprawidłowa nazwa miasta.';
             if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(form.email)) return 'Podaj poprawny adres e-mail.';
             if (!form.addressLine1 || !form.city || !form.postalCode) return 'Uzupełnij adres.';
-            if (!form.acceptedTerms || !form.acceptedPrivacy) return 'Zaakceptuj regulamin i politykę prywatności.';
+
+            if (form.hasOtherDrivingLicense) {
+                if (!form.otherDrivingLicenseCategory.trim()) {
+                    return 'Podaj kategorię posiadanego prawa jazdy.';
+                }
+                if (!form.otherDrivingLicenseNumber.trim()) {
+                    return 'Podaj numer posiadanego prawa jazdy.';
+                }
+            }
+
+            if (form.hasTramPermit) {
+                if (!form.tramPermitNumber.trim()) {
+                    return 'Podaj numer uprawnień do kierowania tramwajem.';
+                }
+            }
+
+            if (!form.acceptedTerms || !form.acceptedPrivacy) {
+                return 'Zaakceptuj regulamin i politykę prywatności.';
+            }
+
             return null;
         }
+
         if (s === 3) {
             if (!form.acceptedSalesTerms) return 'Zaakceptuj regulamin sprzedaży.';
             return null;
         }
+
         return null;
     };
 
@@ -408,7 +449,19 @@ export default function ZapisPage() {
                 pesel: digitsOnly(form.pesel).slice(0, 11),
                 email: sanitizeEmail(form.email),
                 postalCode: formatPostalCode(form.postalCode),
+                otherDrivingLicenseCategory: form.otherDrivingLicenseCategory.trim().toUpperCase(),
+                otherDrivingLicenseNumber: form.otherDrivingLicenseNumber.trim(),
+                tramPermitNumber: form.tramPermitNumber.trim(),
             };
+
+            if (!form.hasOtherDrivingLicense) {
+                delete payload.otherDrivingLicenseCategory;
+                delete payload.otherDrivingLicenseNumber;
+            }
+
+            if (!form.hasTramPermit) {
+                delete payload.tramPermitNumber;
+            }
 
             if (!minor) {
                 delete payload.guardianSameAddress;
@@ -451,6 +504,13 @@ export default function ZapisPage() {
             if (!createdId) throw new Error('Nie udało się odczytać id zapisu.');
 
             setEnrollmentId(createdId);
+
+            if (form.wantsCashPayment) {
+                setMockPay(null);
+                setStep(5);
+                return;
+            }
+
             setStep(4);
 
             const payRes = await fetch(`${API_URL}/enrollments/${createdId}/mock-pay`, {
@@ -526,6 +586,7 @@ export default function ZapisPage() {
                                         {step === 2 && '2) Dane kursanta'}
                                         {step === 3 && '3) Podsumowanie'}
                                         {step === 4 && '4) Płatność'}
+                                        {step === 5 && '5) Zakończenie'}
                                     </h2>
                                     <p className="wizMeta">Krok {step} z 5</p>
                                 </div>
@@ -624,6 +685,7 @@ export default function ZapisPage() {
                                                 />
                                             </div>
                                         </div>
+
                                         <div className="wizGrid2">
                                             <div>
                                                 <label>Data urodzenia</label>
@@ -678,6 +740,7 @@ export default function ZapisPage() {
                                                 </p>
                                             ) : null}
                                         </div>
+
                                         <div className="wizGrid2">
                                             <div>
                                                 <label>PESEL</label>
@@ -722,6 +785,78 @@ export default function ZapisPage() {
                                             />
                                         </div>
 
+                                        <div
+                                            style={{
+                                                display: 'grid',
+                                                gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+                                                gap: 12,
+                                                marginTop: 16,
+                                            }}
+                                        >
+                                            <label className="check" style={{ margin: 0 }}>
+                                                <input
+                                                    type="checkbox"
+                                                    checked={form.hasOtherDrivingLicense}
+                                                    onChange={(e) => {
+                                                        const checked = e.target.checked;
+                                                        set('hasOtherDrivingLicense', checked);
+                                                        if (!checked) {
+                                                            set('otherDrivingLicenseCategory', '');
+                                                            set('otherDrivingLicenseNumber', '');
+                                                        }
+                                                    }}
+                                                />
+                                                Posiadam już prawo jazdy innej kategorii
+                                            </label>
+
+                                            <label className="check" style={{ margin: 0 }}>
+                                                <input
+                                                    type="checkbox"
+                                                    checked={form.hasTramPermit}
+                                                    onChange={(e) => {
+                                                        const checked = e.target.checked;
+                                                        set('hasTramPermit', checked);
+                                                        if (!checked) {
+                                                            set('tramPermitNumber', '');
+                                                        }
+                                                    }}
+                                                />
+                                                Posiadam uprawnienia do kierowania tramwajem
+                                            </label>
+                                        </div>
+
+                                        {form.hasOtherDrivingLicense && (
+                                            <div className="wizGrid2" style={{ marginTop: 10 }}>
+                                                <div>
+                                                    <label>Kategoria posiadanego prawa jazdy</label>
+                                                    <input
+                                                        value={form.otherDrivingLicenseCategory}
+                                                        onChange={(e) => set('otherDrivingLicenseCategory', e.target.value.toUpperCase())}
+                                                        placeholder="np. B, C, D"
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label>Numer prawa jazdy</label>
+                                                    <input
+                                                        value={form.otherDrivingLicenseNumber}
+                                                        onChange={(e) => set('otherDrivingLicenseNumber', e.target.value)}
+                                                        placeholder="Wpisz numer prawa jazdy"
+                                                    />
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {form.hasTramPermit && (
+                                            <div style={{ marginTop: 10 }}>
+                                                <label>Numer uprawnień do kierowania tramwajem</label>
+                                                <input
+                                                    value={form.tramPermitNumber}
+                                                    onChange={(e) => set('tramPermitNumber', e.target.value)}
+                                                    placeholder="Wpisz numer uprawnień"
+                                                />
+                                            </div>
+                                        )}
+
                                         <div style={{ marginTop: 10 }}>
                                             <label className="check" style={{ margin: 0 }}>
                                                 <input
@@ -741,6 +876,7 @@ export default function ZapisPage() {
                                                 Akceptuję politykę prywatności
                                             </label>
                                         </div>
+
                                         {minor && (
                                             <div style={{ marginTop: 12 }}>
                                                 <p className="wizMeta" style={{ marginTop: 0 }}>
@@ -840,6 +976,18 @@ export default function ZapisPage() {
                                                 </div>
                                             </div>
                                         )}
+
+                                        <div style={{ marginTop: 16 }}>
+                                            <label className="check" style={{ margin: 0 }}>
+                                                <input
+                                                    type="checkbox"
+                                                    checked={form.wantsCashPayment}
+                                                    onChange={(e) => set('wantsCashPayment', e.target.checked)}
+                                                />
+                                                Chciałbym uiścić płatność gotówką
+                                            </label>
+                                        </div>
+
                                         <div className="wizActions">
                                             <button type="button" className="pill beige" onClick={back}>
                                                 Wstecz
@@ -856,19 +1004,48 @@ export default function ZapisPage() {
                                 {step === 3 && (
                                     <>
                                         <p className="wizMeta" style={{ marginTop: 0 }}>
-                                            Sprawdź dane. Przed przejściem do płatności wymagamy akceptacji regulaminu sprzedaży.
+                                            Sprawdź dane. Przed zakończeniem zapisu wymagamy akceptacji regulaminu sprzedaży.
                                         </p>
 
                                         <div className="wizGrid2">
                                             <div>
                                                 <p className="wizMeta"><strong>Kurs:</strong> {selectedOffer?.name ?? form.offerItemCode}</p>
                                                 <p className="wizMeta"><strong>Email:</strong> {form.email}</p>
+                                                <p className="wizMeta"><strong>Termin:</strong> {form.courseStartDate ? formatCourseStartDateLabel(form.courseStartDate) : '-'}</p>
                                             </div>
                                             <div>
                                                 <p className="wizMeta"><strong>Imię i nazwisko:</strong> {form.firstName} {form.lastName}</p>
                                                 <p className="wizMeta"><strong>Telefon:</strong> {form.phone}</p>
+                                                <p className="wizMeta">
+                                                    <strong>Sposób płatności:</strong> {form.wantsCashPayment ? 'gotówka' : 'online'}
+                                                </p>
                                             </div>
                                         </div>
+
+                                        {form.hasOtherDrivingLicense && (
+                                            <div style={{ marginTop: 10 }}>
+                                                <p className="wizMeta">
+                                                    <strong>Prawo jazdy innej kategorii:</strong> tak
+                                                </p>
+                                                <p className="wizMeta">
+                                                    <strong>Kategoria:</strong> {form.otherDrivingLicenseCategory}
+                                                </p>
+                                                <p className="wizMeta">
+                                                    <strong>Numer prawa jazdy:</strong> {form.otherDrivingLicenseNumber}
+                                                </p>
+                                            </div>
+                                        )}
+
+                                        {form.hasTramPermit && (
+                                            <div style={{ marginTop: 10 }}>
+                                                <p className="wizMeta">
+                                                    <strong>Uprawnienia do kierowania tramwajem:</strong> tak
+                                                </p>
+                                                <p className="wizMeta">
+                                                    <strong>Numer uprawnień:</strong> {form.tramPermitNumber}
+                                                </p>
+                                            </div>
+                                        )}
 
                                         <div style={{ marginTop: 10 }}>
                                             <label className="check" style={{ margin: 0 }}>
@@ -887,7 +1064,7 @@ export default function ZapisPage() {
                                             </button>
                                             <div className="wizActionsRight">
                                                 <button type="button" className="pill navy" onClick={submit}>
-                                                    Przejdź do płatności
+                                                    {form.wantsCashPayment ? 'Zakończ zapis' : 'Przejdź do płatności'}
                                                 </button>
                                             </div>
                                         </div>
@@ -920,18 +1097,34 @@ export default function ZapisPage() {
 
                                 {step === 5 && (
                                     <>
-                                        <p className="wizMeta" style={{ marginTop: 0 }}>
-                                            Płatność została potwierdzona. Możesz teraz zalogować się do panelu kursanta lub wrócić na stronę główną.
-                                        </p>
-
-                                        {mockPay?.userCreated && mockPay.tempPassword ? (
-                                            <p className="wizMeta">
-                                                Dane testowe do logowania: <strong>{mockPay.email}</strong> / <strong>{mockPay.tempPassword}</strong>
-                                            </p>
+                                        {form.wantsCashPayment ? (
+                                            <>
+                                                <p className="wizMeta" style={{ marginTop: 0 }}>
+                                                    Zapis został zakończony. Wybrano płatność gotówką, więc etap płatności online został pominięty.
+                                                </p>
+                                                <p className="wizMeta">
+                                                    Umowa powinna zostać przygotowana i wysłana zgodnie z logiką backendu.
+                                                </p>
+                                                <p className="wizMeta">
+                                                    Email kursanta: <strong>{form.email}</strong>
+                                                </p>
+                                            </>
                                         ) : (
-                                            <p className="wizMeta">
-                                                Email konta: <strong>{mockPay?.email}</strong>
-                                            </p>
+                                            <>
+                                                <p className="wizMeta" style={{ marginTop: 0 }}>
+                                                    Płatność została potwierdzona. Możesz teraz zalogować się do panelu kursanta lub wrócić na stronę główną.
+                                                </p>
+
+                                                {mockPay?.userCreated && mockPay.tempPassword ? (
+                                                    <p className="wizMeta">
+                                                        Dane testowe do logowania: <strong>{mockPay.email}</strong> / <strong>{mockPay.tempPassword}</strong>
+                                                    </p>
+                                                ) : (
+                                                    <p className="wizMeta">
+                                                        Email konta: <strong>{mockPay?.email}</strong>
+                                                    </p>
+                                                )}
+                                            </>
                                         )}
 
                                         <div className="wizActions">

@@ -90,34 +90,43 @@ model Enrollment {
   city         String
   postalCode   String
 
-    birthDate      DateTime
-    courseMode     CourseMode
-    courseStartDate DateTime
+  birthDate       DateTime
+  courseMode      CourseMode
+  courseStartDate DateTime
 
-    isMinorAtPurchase Boolean @default(false)
+  hasOtherDrivingLicense      Boolean @default(false)
+  otherDrivingLicenseCategory String?
+  otherDrivingLicenseNumber   String?
 
-    guardianPesel        String?
-    guardianFirstName    String?
-    guardianLastName     String?
-    guardianPhone        String?
-    guardianAddressLine1 String?
-    guardianAddressLine2 String?
-    guardianCity         String?
-    guardianPostalCode   String?
+  hasTramPermit     Boolean @default(false)
+  tramPermitNumber  String?
 
-    guardianSameAddress  Boolean? @default(false)
+  wantsCashPayment  Boolean @default(false)
 
-  acceptedTermsAt   DateTime
-  acceptedSalesTermsAt      DateTime?
-  acceptedSalesTermsVersion String?
-  acceptedPrivacyAt DateTime
-  acceptedIp        String?
+  isMinorAtPurchase Boolean @default(false)
+
+  guardianPesel        String?
+  guardianFirstName    String?
+  guardianLastName     String?
+  guardianPhone        String?
+  guardianAddressLine1 String?
+  guardianAddressLine2 String?
+  guardianCity         String?
+  guardianPostalCode   String?
+
+  guardianSameAddress  Boolean? @default(false)
+
+  acceptedTermsAt            DateTime
+  acceptedSalesTermsAt       DateTime?
+  acceptedSalesTermsVersion  String?
+  acceptedPrivacyAt          DateTime
+  acceptedIp                 String?
 
   courseCategoryId String
   courseCategory   CourseCategory @relation(fields: [courseCategoryId], references: [id])
 
-   offerItemId String
-   offerItem   OfferItem @relation(fields: [offerItemId], references: [id])
+  offerItemId String
+  offerItem   OfferItem @relation(fields: [offerItemId], references: [id])
 
   payment  PaymentTransaction?
   contract ContractDocument?
