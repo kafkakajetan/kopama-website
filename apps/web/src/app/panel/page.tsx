@@ -111,6 +111,21 @@ export default function PanelPage() {
         }
     };
 
+    const logout = async () => {
+        try {
+            if (!API_URL) throw new Error('Brak NEXT_PUBLIC_API_URL');
+
+            await fetch(`${API_URL}/auth/logout`, {
+                method: 'POST',
+                credentials: 'include',
+            });
+
+            router.push('/logowanie');
+        } catch {
+            router.push('/logowanie');
+        }
+    };
+
     return (
         <>
             <div className="nav">
@@ -118,7 +133,7 @@ export default function PanelPage() {
                     <div className="logo">K</div>
                     <div className="title">
                         <strong>KopaMa – Panel</strong>
-                        <span>Panel kursanta</span>
+                        <span>Administrator</span>
                     </div>
                 </Link>
 
@@ -126,6 +141,9 @@ export default function PanelPage() {
                     <Link className="pill beige" href="/start">
                         Start
                     </Link>
+                    <button className="pill" type="button" onClick={logout}>
+                        Wyloguj
+                    </button>
                 </div>
             </div>
 
