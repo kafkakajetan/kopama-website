@@ -772,19 +772,22 @@ export default function ZapisPage() {
                                                                 : 'Brak dostępnych terminów'}
                                                     </option>
 
-                                                    {isElearning ? (
-                                                        <p className="kpSelectHint">
-                                                            Dla kursu e-learning termin rozpoczęcia nie jest wymagany na tym etapie.
-                                                        </p>
-                                                    ) : filteredStartSlots.length === 0 ? (
-                                                        <p className="kpSelectHint">
-                                                            Brak dostępnych terminów dla wybranego kursu.
-                                                        </p>
-                                                    ) : null}
+                                                    {filteredStartSlots.map((slot) => (
+                                                        <option
+                                                            key={slot.id}
+                                                            value={slotDateToInputValue(slot.startDate)}
+                                                        >
+                                                            {new Date(slot.startDate).toLocaleDateString('pl-PL')}
+                                                        </option>
+                                                    ))}
                                                 </select>
                                             </div>
 
-                                            {filteredStartSlots.length === 0 ? (
+                                            {isElearning ? (
+                                                <p className="kpSelectHint">
+                                                    Dla kursu e-learning termin rozpoczęcia nie jest wymagany na tym etapie.
+                                                </p>
+                                            ) : filteredStartSlots.length === 0 ? (
                                                 <p className="kpSelectHint">
                                                     Brak dostępnych terminów dla wybranego kursu.
                                                 </p>
