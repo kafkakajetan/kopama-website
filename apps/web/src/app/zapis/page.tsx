@@ -565,8 +565,7 @@ export default function ZapisPage() {
             setMockPay(null);
             setCashAccount(null);
             setStep(4);
-
-            setStep(5);
+            return;
         } catch (e) {
             setError(e instanceof Error ? e.message : 'Błąd zapisu');
         }
