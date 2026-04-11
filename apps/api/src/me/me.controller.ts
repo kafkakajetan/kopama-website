@@ -17,6 +17,11 @@ export class MeController {
     return this.me.getMe(req.user.id);
   }
 
+  @Get('enrollments')
+  getMyEnrollments(@Req() req: ReqWithUser) {
+    return this.me.getMyEnrollments(req.user.id);
+  }
+
   @Patch()
   updateMe(
     @Req() req: ReqWithUser,

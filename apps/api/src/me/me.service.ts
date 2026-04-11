@@ -17,6 +17,38 @@ export class MeService {
     });
   }
 
+  getMyEnrollments(userId: string) {
+    return this.prisma.enrollment.findMany({
+      where: { userId },
+      orderBy: { createdAt: 'desc' },
+      select: {
+        id: true,
+        createdAt: true,
+        status: true,
+        wantsCashPayment: true,
+        courseMode: true,
+        firstName: true,
+        lastName: true,
+        courseCategory: {
+          select: {
+            code: true,
+            name: true,
+          },
+        },
+        uploadedContracts: {
+          orderBy: { createdAt: 'desc' },
+          select: {
+            id: true,
+            originalFileName: true,
+            createdAt: true,
+            sizeBytes: true,
+            storageKey: true,
+          },
+        },
+      },
+    });
+  }
+
   async updateMe(userId: string, body: { email?: string; phone?: string }) {
     const email = body.email
       ? String(body.email).trim().toLowerCase()
