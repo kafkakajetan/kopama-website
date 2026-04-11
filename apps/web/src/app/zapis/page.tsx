@@ -81,7 +81,6 @@ type MockPayResult = {
     email: string;
     userCreated: boolean;
     tempPassword?: string;
-    contractKey: string;
 };
 
 type CreateEnrollmentResult = {
@@ -89,6 +88,14 @@ type CreateEnrollmentResult = {
     email: string;
     userCreated?: boolean;
     tempPassword?: string;
+};
+
+type RegisterP24PaymentResult = {
+    token: string;
+    paymentUrl: string;
+    amountGrosze: number;
+    currency: string;
+    sessionId: string;
 };
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
@@ -555,38 +562,47 @@ export default function ZapisPage() {
                 return;
             }
 
+            setMockPay(null);
+            setCashAccount(null);
             setStep(4);
 
-            const payRes = await fetch(`${API_URL}/enrollments/${created.id}/mock-pay`, {
-                method: 'POST',
-            });
-
-            if (!payRes.ok) {
-                const body = await payRes.json().catch(() => null);
-                const msg =
-                    body?.message
-                        ? Array.isArray(body.message)
-                            ? body.message.join('\n')
-                            : String(body.message)
-                        : `Błąd symulacji płatności (HTTP ${payRes.status})`;
-                throw new Error(msg);
-            }
-
-            const payRaw: unknown = await payRes.json();
-            const pay =
-                payRaw &&
-                typeof payRaw === 'object' &&
-                'ok' in payRaw &&
-                (payRaw as { ok: unknown }).ok === true
-                    ? (payRaw as MockPayResult)
-                    : null;
-
-            if (!pay) throw new Error('Nieprawidłowa odpowiedź z mock-pay.');
-
-            setMockPay(pay);
             setStep(5);
         } catch (e) {
             setError(e instanceof Error ? e.message : 'Błąd zapisu');
+        }
+    };
+
+    const startP24Payment = async () => {
+        try {
+            setError('');
+
+            if (!API_URL) throw new Error('Brak NEXT_PUBLIC_API_URL w apps/web/.env.local');
+            if (!enrollmentId) throw new Error('Brak id zapisu do opłacenia.');
+
+            const res = await fetch(
+                `${API_URL}/payments/p24/enrollments/${enrollmentId}/register`,
+                {
+                    method: 'POST',
+                },
+            );
+
+            const body = (await res.json().catch(() => null)) as RegisterP24PaymentResult | { message?: string } | null;
+
+            if (!res.ok) {
+                const msg =
+                    body && typeof body === 'object' && 'message' in body && body.message
+                        ? String(body.message)
+                        : 'Nie udało się rozpocząć płatności Przelewy24.';
+                throw new Error(msg);
+            }
+
+            if (!body || typeof body !== 'object' || !('paymentUrl' in body) || typeof body.paymentUrl !== 'string') {
+                throw new Error('Brak adresu płatności z Przelewy24.');
+            }
+
+            window.location.href = body.paymentUrl;
+        } catch (e) {
+            setError(e instanceof Error ? e.message : 'Błąd rozpoczęcia płatności');
         }
     };
 
@@ -1175,8 +1191,8 @@ export default function ZapisPage() {
                                                 Wstecz
                                             </button>
                                             <div className="wizActionsRight">
-                                                <button type="button" className="pill navy" disabled>
-                                                    Płatność (wkrótce)
+                                                <button type="button" className="pill navy" onClick={startP24Payment}>
+                                                    Przejdź do Przelewy24
                                                 </button>
                                             </div>
                                         </div>
