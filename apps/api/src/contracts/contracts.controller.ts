@@ -1,10 +1,31 @@
-import { Controller, Get, NotFoundException, Param, Res } from '@nestjs/common';
-import type { Response } from 'express';
+import {
+  Controller,
+  Get,
+  NotFoundException,
+  Param,
+  Post,
+  Res,
+  Req,
+  UploadedFile,
+  UseGuards,
+  UseInterceptors,
+  BadRequestException,
+} from '@nestjs/common';
+import type { Request, Response } from 'express';
 import * as fs from 'fs/promises';
 import * as path from 'path';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { memoryStorage } from 'multer';
+import { JwtCookieGuard } from '../auth/jwt-cookie.guard';
+import { ContractsService } from './contracts.service';
+
+type ReqWithUser = Request & {
+  user: { id: string; role: string; email: string };
+};
 
 @Controller('contracts')
 export class ContractsController {
+  constructor(private readonly contractsService: ContractsService) {}
   @Get(':enrollmentId/test-file')
   async getTestFile(
     @Param('enrollmentId') enrollmentId: string,
@@ -26,5 +47,43 @@ export class ContractsController {
 
     res.setHeader('Content-Type', 'text/plain; charset=utf-8');
     return res.sendFile(filePath);
+  }
+
+  @Post('enrollments/:enrollmentId/upload')
+  @UseGuards(JwtCookieGuard)
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: memoryStorage(),
+      limits: {
+        fileSize: 15 * 1024 * 1024,
+      },
+      fileFilter: (_req, file, cb) => {
+        const isPdf =
+          String(file.originalname ?? '')
+            .toLowerCase()
+            .endsWith('.pdf') &&
+          String(file.mimetype ?? '').toLowerCase() === 'application/pdf';
+
+        if (!isPdf) {
+          return cb(
+            new BadRequestException('Dozwolone są wyłącznie pliki PDF.'),
+            false,
+          );
+        }
+
+        cb(null, true);
+      },
+    }),
+  )
+  uploadStudentContract(
+    @Param('enrollmentId') enrollmentId: string,
+    @UploadedFile() file: Express.Multer.File,
+    @Req() req: ReqWithUser,
+  ) {
+    return this.contractsService.uploadStudentContract({
+      enrollmentId,
+      userId: req.user.id,
+      file,
+    });
   }
 }

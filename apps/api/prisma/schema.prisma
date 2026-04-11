@@ -39,6 +39,11 @@ enum ContractStatus {
   MANUAL_DELIVERY_PENDING
 }
 
+enum UploadedContractSource {
+  STUDENT
+  ADMIN
+}
+
 model User {
   id              String           @id @default(cuid())
   createdAt       DateTime         @default(now())
@@ -51,9 +56,10 @@ model User {
   firstName       String?
   lastName        String?
 
-  enrollments     Enrollment[]
+   enrollments        Enrollment[]
+   uploadedContracts  UploadedContract[]
 
-  specializations CourseCategory[] @relation("InstructorSpecializations")
+   specializations CourseCategory[] @relation("InstructorSpecializations")
   drivingCategories  DrivingCategory[] @relation("InstructorDrivingCategories")
 }
 
@@ -136,6 +142,8 @@ model Enrollment {
   payment  PaymentTransaction?
   contract ContractDocument?
 
+  uploadedContracts UploadedContract[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -179,6 +187,27 @@ model ContractDocument {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+model UploadedContract {
+  id               String                 @id @default(cuid())
+  enrollmentId     String
+  enrollment       Enrollment             @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+
+  uploadedByUserId String?
+  uploadedByUser   User?                  @relation(fields: [uploadedByUserId], references: [id])
+
+  source           UploadedContractSource
+  originalFileName String
+  storageKey       String
+  mimeType         String
+  sizeBytes        Int
+
+  createdAt        DateTime               @default(now())
+  updatedAt        DateTime               @updatedAt
+
+  @@index([enrollmentId, createdAt])
+  @@index([uploadedByUserId])
 }
 
 enum OfferType {
