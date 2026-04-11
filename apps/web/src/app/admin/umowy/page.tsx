@@ -264,131 +264,151 @@ export default function AdminContractsPage() {
 
                     {contracts.length === 0 ? <p>Brak dodanych umów.</p> : null}
                 </div>
-
-            </section>
-            {isAddModalOpen ? (
-                <div
-                    style={{
-                        position: 'fixed',
-                        inset: 0,
-                        background: 'rgba(0,0,0,.45)',
-                        display: 'grid',
-                        placeItems: 'center',
-                        zIndex: 1000,
-                        padding: 20,
-                    }}
-                >
+                {isAddModalOpen ? (
                     <div
                         style={{
-                            width: '100%',
-                            maxWidth: 760,
-                            maxHeight: '85vh',
-                            overflow: 'auto',
-                            background: '#f3f4f6',
-                            borderRadius: 20,
-                            padding: 24,
-                            color: '#111827',
+                            position: 'fixed',
+                            inset: 0,
+                            background: 'rgba(0,0,0,.45)',
+                            zIndex: 1000,
+                            padding: '32px 20px',
+                            overflowY: 'auto',
                         }}
                     >
                         <div
                             style={{
-                                display: 'flex',
-                                justifyContent: 'space-between',
-                                alignItems: 'center',
-                                gap: 12,
-                                marginBottom: 16,
+                                width: '100%',
+                                maxWidth: 860,
+                                margin: '0 auto',
+                                maxHeight: 'calc(100vh - 64px)',
+                                overflow: 'hidden',
+                                background: '#f3f4f6',
+                                borderRadius: 20,
+                                color: '#111827',
+                                boxShadow: '0 20px 60px rgba(0,0,0,.25)',
                             }}
                         >
-                            <h3 style={{ margin: 0 }}>Dodaj umowę</h3>
-                            <button
-                                type="button"
-                                className="submit"
-                                onClick={() => {
-                                    setIsAddModalOpen(false);
-                                    setTargetQuery('');
-                                    setSelectedEnrollmentId('');
+                            <div
+                                style={{
+                                    display: 'flex',
+                                    justifyContent: 'space-between',
+                                    alignItems: 'center',
+                                    gap: 12,
+                                    padding: '24px 24px 16px',
+                                    borderBottom: '1px solid #e5e7eb',
+                                    background: '#f3f4f6',
+                                    position: 'sticky',
+                                    top: 0,
+                                    zIndex: 2,
                                 }}
-                                style={{ width: 'auto', paddingInline: 16 }}
                             >
-                                Zamknij
-                            </button>
-                        </div>
-
-                        <label>Wyszukaj kursanta</label>
-                        <input
-                            value={targetQuery}
-                            onChange={(e) => setTargetQuery(e.target.value)}
-                            placeholder="Wpisz imię lub nazwisko"
-                            style={{ marginBottom: 16 }}
-                        />
-
-                        <div style={{ display: 'grid', gap: 10, marginBottom: 18 }}>
-                            {filteredTargets.map((target) => (
-                                <label
-                                    key={target.id}
-                                    style={{
-                                        display: 'block',
-                                        border: selectedEnrollmentId === target.id
-                                            ? '2px solid #0f3fb8'
-                                            : '1px solid #d1d5db',
-                                        borderRadius: 14,
-                                        padding: 14,
-                                        background: '#fff',
-                                        cursor: 'pointer',
+                                <h3 style={{ margin: 0 }}>Dodaj umowę</h3>
+                                <button
+                                    type="button"
+                                    className="submit"
+                                    onClick={() => {
+                                        setIsAddModalOpen(false);
+                                        setTargetQuery('');
+                                        setSelectedEnrollmentId('');
                                     }}
+                                    style={{ width: 'auto', paddingInline: 16 }}
                                 >
-                                    <input
-                                        type="radio"
-                                        name="selectedEnrollment"
-                                        value={target.id}
-                                        checked={selectedEnrollmentId === target.id}
-                                        onChange={() => setSelectedEnrollmentId(target.id)}
-                                        style={{ marginRight: 10 }}
-                                    />
-                                    <strong>{target.firstName} {target.lastName}</strong>
-                                    <div style={{ fontSize: 14, marginTop: 6 }}>
-                                        {target.courseCategory.name} •{' '}
-                                        {target.courseMode === 'ELEARNING' ? 'e-learning' : 'stacjonarny'}
-                                    </div>
-                                    <div style={{ fontSize: 13, opacity: 0.75, marginTop: 4 }}>
-                                        Zapis: {new Date(target.createdAt).toLocaleString('pl-PL')}
-                                    </div>
-                                </label>
-                            ))}
-
-                            {filteredTargets.length === 0 ? (
-                                <div style={{ fontSize: 14, opacity: 0.75 }}>
-                                    Brak pasujących zapisów.
-                                </div>
-                            ) : null}
-                        </div>
-
-                        <label
-                            className="submit navy"
-                            style={{
-                                display: 'inline-block',
-                                width: 'auto',
-                                paddingInline: 18,
-                                cursor: !selectedEnrollmentId || uploading ? 'default' : 'pointer',
-                                opacity: !selectedEnrollmentId || uploading ? 0.7 : 1,
-                            }}
-                        >
-                            {uploading ? 'Wgrywanie...' : 'Wybierz PDF i dodaj'}
-                            <input
-                                type="file"
-                                accept="application/pdf,.pdf"
-                                style={{ display: 'none' }}
-                                disabled={!selectedEnrollmentId || uploading}
-                                onChange={(e) => {
-                                    const file = e.target.files?.[0] ?? null;
-                                    void uploadAdminContract(file);
-                                    e.currentTarget.value = '';
+                                    Zamknij
+                                </button>
+                            </div>
+                            <div
+                                style={{
+                                    padding: '16px 24px 24px',
+                                    maxHeight: 'calc(100vh - 220px)',
+                                    overflowY: 'auto',
                                 }}
-                            />
-                        </label>
+                            >
+                                <label>Wyszukaj kursanta</label>
+                                <input
+                                    value={targetQuery}
+                                    onChange={(e) => setTargetQuery(e.target.value)}
+                                    placeholder="Wpisz imię lub nazwisko"
+                                    style={{ marginBottom: 16 }}
+                                />
+
+                                <div style={{ display: 'grid', gap: 10, marginBottom: 18 }}>
+                                    {filteredTargets.map((target) => (
+                                        <label
+                                            key={target.id}
+                                            style={{
+                                                display: 'block',
+                                                border: selectedEnrollmentId === target.id
+                                                    ? '2px solid #0f3fb8'
+                                                    : '1px solid #d1d5db',
+                                                borderRadius: 14,
+                                                padding: 14,
+                                                background: '#fff',
+                                                cursor: 'pointer',
+                                            }}
+                                        >
+                                            <input
+                                                type="radio"
+                                                name="selectedEnrollment"
+                                                value={target.id}
+                                                checked={selectedEnrollmentId === target.id}
+                                                onChange={() => setSelectedEnrollmentId(target.id)}
+                                                style={{ marginRight: 10 }}
+                                            />
+                                            <strong>{target.firstName} {target.lastName}</strong>
+                                            <div style={{ fontSize: 14, marginTop: 6 }}>
+                                                {target.courseCategory.name} •{' '}
+                                                {target.courseMode === 'ELEARNING' ? 'e-learning' : 'stacjonarny'}
+                                            </div>
+                                            <div style={{ fontSize: 13, opacity: 0.75, marginTop: 4 }}>
+                                                Zapis: {new Date(target.createdAt).toLocaleString('pl-PL')}
+                                            </div>
+                                        </label>
+                                    ))}
+
+                                    {filteredTargets.length === 0 ? (
+                                        <div style={{ fontSize: 14, opacity: 0.75 }}>
+                                            Brak pasujących zapisów.
+                                        </div>
+                                    ) : null}
+                                </div>
+                            </div>
+                            <div
+                                style={{
+                                    padding: '16px 24px 24px',
+                                    borderTop: '1px solid #e5e7eb',
+                                    background: '#f3f4f6',
+                                    position: 'sticky',
+                                    bottom: 0,
+                                }}
+                            >
+                                    <label
+                                        className="submit navy"
+                                        style={{
+                                            display: 'inline-block',
+                                            width: 'auto',
+                                            paddingInline: 18,
+                                            cursor: !selectedEnrollmentId || uploading ? 'default' : 'pointer',
+                                            opacity: !selectedEnrollmentId || uploading ? 0.7 : 1,
+                                        }}
+                                    >
+                                    {uploading ? 'Wgrywanie...' : 'Wybierz PDF i dodaj'}
+                                    <input
+                                        type="file"
+                                        accept="application/pdf,.pdf"
+                                        style={{ display: 'none' }}
+                                        disabled={!selectedEnrollmentId || uploading}
+                                        onChange={(e) => {
+                                            const file = e.target.files?.[0] ?? null;
+                                            void uploadAdminContract(file);
+                                            e.currentTarget.value = '';
+                                        }}
+                                    />
+                                </label>
+                            </div>
+                        </div>
                     </div>
-                </div>
-            ) : null}
+                ) : null}
+            </section>
         </div>
     );
 }
