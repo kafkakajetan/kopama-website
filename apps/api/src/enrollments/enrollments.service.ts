@@ -1,11 +1,7 @@
-import { BadRequestException, Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
 import { randomBytes } from 'crypto';
-import * as fs from 'fs/promises';
-import * as path from 'path';
 import { AuthService } from '../auth/auth.service';
-import { ContractPdfService } from '../contracts/contract-pdf.service';
-import { MailService } from '../mail/mail.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateEnrollmentDto } from './dto/create-enrollment.dto';
 import { CourseStartSlotsService } from '../course-start-slots/course-start-slots.service';
@@ -32,7 +28,6 @@ export type MockPayResult = {
   email: string;
   userCreated: boolean;
   tempPassword?: string;
-  contractKey: string;
 };
 
 export type CreateEnrollmentResult = EnrollmentWithCategory & {
@@ -42,13 +37,9 @@ export type CreateEnrollmentResult = EnrollmentWithCategory & {
 
 @Injectable()
 export class EnrollmentsService {
-  private readonly logger = new Logger(EnrollmentsService.name);
-
   constructor(
     private readonly prisma: PrismaService,
     private readonly auth: AuthService,
-    private readonly contractPdf: ContractPdfService,
-    private readonly mailService: MailService,
     private readonly courseStartSlotsService: CourseStartSlotsService,
   ) {}
 
@@ -380,83 +371,12 @@ export class EnrollmentsService {
       });
     }
 
-    if (linkedUserId) {
-      await this.prisma.enrollment.update({
-        where: { id: enrollmentId },
-        data: { userId: linkedUserId },
-      });
-    }
-
-    const dir = path.join(process.cwd(), 'storage', 'contracts');
-    await fs.mkdir(dir, { recursive: true });
-
-    const contractKey = `contract_${enrollmentId}.txt`;
-    const filePath = path.join(dir, contractKey);
-
-    const content =
-      `UMOWA (TEST)\n` +
-      `Zapis: ${enrollment.id}\n` +
-      `Kurs: ${enrollment.offerItem.name}\n` +
-      `Kursant: ${enrollment.firstName} ${enrollment.lastName}\n` +
-      `PESEL: ${enrollment.pesel}\n` +
-      `Email: ${enrollment.email}\n` +
-      `Telefon: ${enrollment.phone}\n` +
-      `Adres: ${enrollment.addressLine1}${enrollment.addressLine2 ? ' ' + enrollment.addressLine2 : ''}, ${enrollment.postalCode} ${enrollment.city}\n`;
-
-    await fs.writeFile(filePath, content, 'utf8');
-
-    await this.prisma.contractDocument.upsert({
-      where: { enrollmentId },
-      update: {
-        status: 'GENERATED',
-        storageKey: contractKey,
-        generatedAt: new Date(),
-      },
-      create: {
-        enrollmentId,
-        status: 'GENERATED',
-        storageKey: contractKey,
-        generatedAt: new Date(),
-        templateVer: 'v1',
-        fileHash: null,
-      },
-    });
-
-    const fullName = `${enrollment.firstName} ${enrollment.lastName}`;
-    const address =
-      `${enrollment.addressLine1}` +
-      `${enrollment.addressLine2 ? ` ${enrollment.addressLine2}` : ''}, ` +
-      `${enrollment.postalCode} ${enrollment.city}`;
-
-    const pdf = await this.contractPdf.generateTestContractPdf({
-      fileId: enrollment.id,
-      fullName,
-      email: enrollment.email,
-      phone: enrollment.phone,
-      pesel: enrollment.pesel,
-      address,
-      courseName: enrollment.offerItem.name,
-    });
-
-    try {
-      await this.mailService.sendContractEmail({
-        to: email,
-        fullName,
-        contractAbsolutePath: pdf.absolutePath,
-        loginEmail: userCreated ? email : undefined,
-        plainPassword: userCreated ? tempPassword : undefined,
-      });
-    } catch (error: unknown) {
-      this.logger.error('Nie udało się wysłać maila z umową PDF.', error);
-    }
-
     return {
       ok: true,
       enrollmentId,
       email,
       userCreated,
       tempPassword,
-      contractKey,
     };
   }
 }
