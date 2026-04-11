@@ -3,7 +3,7 @@ import type { Request } from 'express';
 import { CreateEnrollmentDto } from './dto/create-enrollment.dto';
 import {
   EnrollmentsService,
-  type EnrollmentWithCategory,
+  type CreateEnrollmentResult,
 } from './enrollments.service';
 
 @Controller('enrollments')
@@ -19,7 +19,7 @@ export class EnrollmentsController {
   create(
     @Body() dto: CreateEnrollmentDto,
     @Req() req: Request,
-  ): Promise<EnrollmentWithCategory> {
+  ): Promise<CreateEnrollmentResult> {
     return this.service.create(dto, req.ip);
   }
 }

@@ -84,6 +84,13 @@ type MockPayResult = {
     contractKey: string;
 };
 
+type CreateEnrollmentResult = {
+    id: string;
+    email: string;
+    userCreated?: boolean;
+    tempPassword?: string;
+};
+
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
 function formatPLN(priceZloty: string): string {
@@ -177,6 +184,11 @@ export default function ZapisPage() {
     const [error, setError] = useState<string>('');
     const [enrollmentId, setEnrollmentId] = useState<string>('');
     const [mockPay, setMockPay] = useState<MockPayResult | null>(null);
+    const [cashAccount, setCashAccount] = useState<{
+        email: string;
+        userCreated: boolean;
+        tempPassword?: string;
+    } | null>(null);
     const [courseLanguage, setCourseLanguage] = useState<CourseLanguage>('PL');
 
     const [offers, setOffers] = useState<OfferItem[]>([]);
@@ -517,27 +529,35 @@ export default function ZapisPage() {
             }
 
             const createdRaw: unknown = await res.json();
-            const createdId =
+            const created =
                 createdRaw &&
                 typeof createdRaw === 'object' &&
                 'id' in createdRaw &&
                 typeof (createdRaw as { id: unknown }).id === 'string'
-                    ? (createdRaw as { id: string }).id
+                    ? (createdRaw as CreateEnrollmentResult)
                     : null;
 
-            if (!createdId) throw new Error('Nie udało się odczytać id zapisu.');
+            if (!created) throw new Error('Nie udało się odczytać id zapisu.');
 
-            setEnrollmentId(createdId);
+            setEnrollmentId(created.id);
 
             if (form.wantsCashPayment) {
                 setMockPay(null);
+                setCashAccount({
+                    email: created.email,
+                    userCreated: created.userCreated === true,
+                    tempPassword:
+                        typeof created.tempPassword === 'string'
+                            ? created.tempPassword
+                            : undefined,
+                });
                 setStep(5);
                 return;
             }
 
             setStep(4);
 
-            const payRes = await fetch(`${API_URL}/enrollments/${createdId}/mock-pay`, {
+            const payRes = await fetch(`${API_URL}/enrollments/${created.id}/mock-pay`, {
                 method: 'POST',
             });
 
@@ -1167,11 +1187,19 @@ export default function ZapisPage() {
                                                 <p className="wizMeta" style={{ marginTop: 0 }}>
                                                     Zapis został zakończony. Wybrano płatność gotówką, więc etap płatności online został pominięty.
                                                 </p>
+
+                                                {cashAccount?.userCreated && cashAccount.tempPassword ? (
+                                                    <p className="wizMeta">
+                                                        Dane do logowania: <strong>{cashAccount.email}</strong> / <strong>{cashAccount.tempPassword}</strong>
+                                                    </p>
+                                                ) : (
+                                                    <p className="wizMeta">
+                                                        Konto kursanta jest powiązane z emailem: <strong>{cashAccount?.email ?? form.email}</strong>
+                                                    </p>
+                                                )}
+
                                                 <p className="wizMeta">
-                                                    Umowa powinna zostać przygotowana i wysłana zgodnie z logiką backendu.
-                                                </p>
-                                                <p className="wizMeta">
-                                                    Email kursanta: <strong>{form.email}</strong>
+                                                    Po zalogowaniu kursant będzie mógł dodać umowę w panelu.
                                                 </p>
                                             </>
                                         ) : (

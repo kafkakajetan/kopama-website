@@ -35,6 +35,11 @@ export type MockPayResult = {
   contractKey: string;
 };
 
+export type CreateEnrollmentResult = EnrollmentWithCategory & {
+  userCreated?: boolean;
+  tempPassword?: string;
+};
+
 @Injectable()
 export class EnrollmentsService {
   private readonly logger = new Logger(EnrollmentsService.name);
@@ -50,7 +55,7 @@ export class EnrollmentsService {
   async create(
     dto: CreateEnrollmentDto,
     ip?: string,
-  ): Promise<EnrollmentWithCategory> {
+  ): Promise<CreateEnrollmentResult> {
     if (!dto.acceptedTerms || !dto.acceptedPrivacy) {
       throw new BadRequestException(
         'Wymagana akceptacja regulaminu i polityki prywatności.',
@@ -206,7 +211,7 @@ export class EnrollmentsService {
 
     const guardianSameAddress = dto.guardianSameAddress === true;
 
-    return this.prisma.enrollment.create({
+    let createdEnrollment = await this.prisma.enrollment.create({
       data: {
         status: 'PAYMENT_PENDING',
         firstName: dto.firstName,
@@ -284,6 +289,42 @@ export class EnrollmentsService {
         offerItem: true,
       },
     });
+
+    let tempPassword: string | undefined;
+    let userCreated = false;
+
+    if (dto.wantsCashPayment && !existingUser) {
+      tempPassword = `Test${randomBytes(3).toString('hex')}!1`;
+      const passwordHash = await this.auth.hashPassword(tempPassword);
+
+      const createdUser = await this.prisma.user.create({
+        data: {
+          email: normalizedEmail,
+          phone: dto.phone,
+          role: 'STUDENT',
+          passwordHash,
+          firstName: dto.firstName,
+          lastName: dto.lastName,
+        },
+        select: { id: true },
+      });
+
+      createdEnrollment = await this.prisma.enrollment.update({
+        where: { id: createdEnrollment.id },
+        data: { userId: createdUser.id },
+        include: {
+          courseCategory: true,
+          offerItem: true,
+        },
+      });
+
+      userCreated = true;
+    }
+
+    return {
+      ...createdEnrollment,
+      ...(dto.wantsCashPayment ? { userCreated, tempPassword } : {}),
+    };
   }
 
   async mockPay(enrollmentId: string): Promise<MockPayResult> {
@@ -322,12 +363,21 @@ export class EnrollmentsService {
           phone: enrollment.phone,
           role: 'STUDENT',
           passwordHash,
+          firstName: enrollment.firstName,
+          lastName: enrollment.lastName,
         },
         select: { id: true },
       });
 
       linkedUserId = createdUser.id;
       userCreated = true;
+    }
+
+    if (linkedUserId) {
+      await this.prisma.enrollment.update({
+        where: { id: enrollmentId },
+        data: { userId: linkedUserId },
+      });
     }
 
     if (linkedUserId) {
