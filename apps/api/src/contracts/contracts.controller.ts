@@ -18,6 +18,7 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
 import { JwtCookieGuard } from '../auth/jwt-cookie.guard';
 import { ContractsService } from './contracts.service';
+import { AdminGuard } from '../auth/admin.guard';
 
 type ReqWithUser = Request & {
   user: { id: string; role: string; email: string };
@@ -81,6 +82,44 @@ export class ContractsController {
     @Req() req: ReqWithUser,
   ) {
     return this.contractsService.uploadStudentContract({
+      enrollmentId,
+      userId: req.user.id,
+      file,
+    });
+  }
+
+  @Post('admin/enrollments/:enrollmentId/upload')
+  @UseGuards(JwtCookieGuard, AdminGuard)
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: memoryStorage(),
+      limits: {
+        fileSize: 15 * 1024 * 1024,
+      },
+      fileFilter: (_req, file, cb) => {
+        const isPdf =
+          String(file.originalname ?? '')
+            .toLowerCase()
+            .endsWith('.pdf') &&
+          String(file.mimetype ?? '').toLowerCase() === 'application/pdf';
+
+        if (!isPdf) {
+          return cb(
+            new BadRequestException('Dozwolone są wyłącznie pliki PDF.'),
+            false,
+          );
+        }
+
+        cb(null, true);
+      },
+    }),
+  )
+  uploadAdminContract(
+    @Param('enrollmentId') enrollmentId: string,
+    @UploadedFile() file: Express.Multer.File,
+    @Req() req: ReqWithUser,
+  ) {
+    return this.contractsService.uploadAdminContract({
       enrollmentId,
       userId: req.user.id,
       file,

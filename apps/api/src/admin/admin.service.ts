@@ -171,6 +171,24 @@ export class AdminService {
     });
   }
 
+  async listContractTargets() {
+    return this.prisma.enrollment.findMany({
+      orderBy: { createdAt: 'desc' },
+      select: {
+        id: true,
+        createdAt: true,
+        firstName: true,
+        lastName: true,
+        courseMode: true,
+        courseCategory: {
+          select: {
+            name: true,
+          },
+        },
+      },
+    });
+  }
+
   async listDrivingCategories() {
     return this.prisma.drivingCategory.findMany({
       orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],

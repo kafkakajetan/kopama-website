@@ -27,6 +27,11 @@ export class AdminController {
     return this.admin.listContracts();
   }
 
+  @Get('contracts/targets')
+  getContractTargets() {
+    return this.admin.listContractTargets();
+  }
+
   @Get('contracts/view')
   viewContract(@Query('path') relativePath: string) {
     return this.admin.readContract(relativePath);
