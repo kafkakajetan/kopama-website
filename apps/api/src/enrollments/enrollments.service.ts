@@ -163,6 +163,13 @@ export class EnrollmentsService {
       );
     }
 
+    const normalizedEmail = dto.email.trim().toLowerCase();
+
+    const existingUser = await this.prisma.user.findUnique({
+      where: { email: normalizedEmail },
+      select: { id: true },
+    });
+
     const isBAfterB1 = offer.courseCategory?.code === 'B_AFTER_B1';
     const hasOtherDrivingLicense = isBAfterB1 || dto.hasOtherDrivingLicense;
 
@@ -204,7 +211,8 @@ export class EnrollmentsService {
         status: 'PAYMENT_PENDING',
         firstName: dto.firstName,
         lastName: dto.lastName,
-        email: dto.email,
+        email: normalizedEmail,
+        userId: existingUser?.id ?? null,
         phone: dto.phone,
         pesel: dto.pesel,
         addressLine1: dto.addressLine1,
@@ -297,24 +305,36 @@ export class EnrollmentsService {
 
     const existingUser = await this.prisma.user.findUnique({
       where: { email },
+      select: { id: true },
     });
+
     let tempPassword: string | undefined;
     let userCreated = false;
+    let linkedUserId = existingUser?.id ?? null;
 
     if (!existingUser) {
       tempPassword = `Test${randomBytes(3).toString('hex')}!1`;
       const passwordHash = await this.auth.hashPassword(tempPassword);
 
-      await this.prisma.user.create({
+      const createdUser = await this.prisma.user.create({
         data: {
           email,
           phone: enrollment.phone,
           role: 'STUDENT',
           passwordHash,
         },
+        select: { id: true },
       });
 
+      linkedUserId = createdUser.id;
       userCreated = true;
+    }
+
+    if (linkedUserId) {
+      await this.prisma.enrollment.update({
+        where: { id: enrollmentId },
+        data: { userId: linkedUserId },
+      });
     }
 
     const dir = path.join(process.cwd(), 'storage', 'contracts');

@@ -51,6 +51,8 @@ model User {
   firstName       String?
   lastName        String?
 
+  enrollments     Enrollment[]
+
   specializations CourseCategory[] @relation("InstructorSpecializations")
   drivingCategories  DrivingCategory[] @relation("InstructorDrivingCategories")
 }
@@ -122,6 +124,9 @@ model Enrollment {
   acceptedPrivacyAt          DateTime
   acceptedIp                 String?
 
+  userId String?
+  user   User? @relation(fields: [userId], references: [id])
+
   courseCategoryId String
   courseCategory   CourseCategory @relation(fields: [courseCategoryId], references: [id])
 
@@ -136,6 +141,7 @@ model Enrollment {
 
   @@index([email])
   @@index([status])
+  @@index([userId])
 }
 
 model PaymentTransaction {
