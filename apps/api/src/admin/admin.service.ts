@@ -185,39 +185,57 @@ export class AdminService {
   }
 
   async listContracts() {
-    const storageRoot = this.getStorageRoot();
+    return this.prisma.uploadedContract.findMany({
+      orderBy: { createdAt: 'desc' },
+      select: {
+        id: true,
+        originalFileName: true,
+        storageKey: true,
+        mimeType: true,
+        sizeBytes: true,
+        createdAt: true,
+        source: true,
+        enrollment: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            courseMode: true,
+            courseCategory: {
+              select: {
+                name: true,
+              },
+            },
+          },
+        },
+      },
+    });
+  }
 
-    if (!existsSync(storageRoot)) {
-      return [];
+  async getUploadedContractAbsolutePath(contractId: string) {
+    const contract = await this.prisma.uploadedContract.findUnique({
+      where: { id: contractId },
+      select: {
+        id: true,
+        storageKey: true,
+      },
+    });
+
+    if (!contract) {
+      throw new NotFoundException('Nie znaleziono pliku umowy.');
     }
 
-    const files = await this.walk(storageRoot);
+    const storageRoot = this.getStorageRoot();
+    const absolutePath = path.resolve(storageRoot, contract.storageKey);
 
-    const contracts = await Promise.all(
-      files
-        .filter((file) =>
-          ['.txt', '.pdf'].includes(path.extname(file).toLowerCase()),
-        )
-        .map(async (absolutePath) => {
-          const fileStat = await stat(absolutePath);
-          const relativePath = path
-            .relative(storageRoot, absolutePath)
-            .split(path.sep)
-            .join('/');
+    if (!absolutePath.startsWith(storageRoot) || !existsSync(absolutePath)) {
+      throw new NotFoundException('Nie znaleziono pliku umowy.');
+    }
 
-          return {
-            path: relativePath,
-            fileName: path.basename(absolutePath),
-            size: fileStat.size,
-            updatedAt: fileStat.mtime,
-          };
-        }),
-    );
-
-    contracts.sort(
-      (a, b) => Number(new Date(b.updatedAt)) - Number(new Date(a.updatedAt)),
-    );
-    return contracts;
+    return {
+      absolutePath,
+      fileName: path.basename(absolutePath),
+    };
   }
 
   async readContract(relativePath: string) {

@@ -5,14 +5,34 @@ import {useEffect, useState} from "react";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
+type Me = {
+    role: 'ADMIN' | 'STUDENT' | 'INSTRUCTOR';
+};
+
+type ContractItem = {
+    id: string;
+    originalFileName: string;
+    storageKey: string;
+    mimeType: string;
+    sizeBytes: number;
+    createdAt: string;
+    source: 'STUDENT' | 'ADMIN';
+    enrollment: {
+        id: string;
+        firstName: string;
+        lastName: string;
+        courseMode: 'STATIONARY' | 'ELEARNING';
+        courseCategory: {
+            name: string;
+        };
+    };
+};
+
 export default function AdminContractsPage() {
 
     const router = useRouter();
 
     const [contracts, setContracts] = useState<ContractItem[]>([]);
-    const [contractPreviews, setContractPreviews] = useState<Record<string, ContractPreview>>({});
-    const [openedContractPath, setOpenedContractPath] = useState<string | null>(null);
-    const [loadingPreviewPath, setLoadingPreviewPath] = useState<string | null>(null);
     const [error, setError] = useState('');
 
     const loadContracts = async () => {
@@ -55,54 +75,13 @@ export default function AdminContractsPage() {
         setContracts(contractsData);
     };
 
-    const previewContract = async (contractPath: string) => {
-        if (openedContractPath === contractPath) {
-            setOpenedContractPath(null);
-            return;
-        }
-
-        setError('');
-        setOpenedContractPath(contractPath);
-
-        if (contractPreviews[contractPath]) {
-            return;
-        }
-
-        try {
-            if (!API_URL) throw new Error('Brak NEXT_PUBLIC_API_URL');
-
-            setLoadingPreviewPath(contractPath);
-
-            const res = await fetch(`${API_URL}/admin/contracts/view?path=${encodeURIComponent(contractPath)}`, {
-                credentials: 'include',
-            });
-
-            if (!res.ok) {
-                const body = await res.json().catch(() => null);
-                const msg = body?.message ? String(body.message) : 'Nie udało się pobrać umowy.';
-                throw new Error(msg);
-            }
-
-            const data = (await res.json()) as ContractPreview;
-            setContractPreviews((prev) => ({
-                ...prev,
-                [contractPath]: data,
-            }));
-        } catch (e) {
-            setOpenedContractPath(null);
-            setError(e instanceof Error ? e.message : 'Błąd podglądu umowy');
-        } finally {
-            setLoadingPreviewPath((prev) => (prev === contractPath ? null : prev));
-        }
-    };
-
-    const downloadContract = async (contractPath: string) => {
+    const downloadContract = async (contractId: string, fileName: string) => {
         try {
             setError('');
 
             if (!API_URL) throw new Error('Brak NEXT_PUBLIC_API_URL');
 
-            const res = await fetch(`${API_URL}/admin/contracts/download?path=${encodeURIComponent(contractPath)}`, {
+            const res = await fetch(`${API_URL}/admin/contracts/download?id=${encodeURIComponent(contractId)}`, {
                 credentials: 'include',
             });
 
@@ -114,7 +93,7 @@ export default function AdminContractsPage() {
             const url = window.URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = contractPath.split('/').pop() ?? 'umowa.txt';
+            a.download = fileName;
             document.body.appendChild(a);
             a.click();
             a.remove();
@@ -134,74 +113,53 @@ export default function AdminContractsPage() {
         <div className="forms" style={{ gridTemplateColumns: '1fr', gap: 24 }}>
             <section className="formcard active">
                 <h2>Umowy</h2>
-                <p>Liczba plików umów: {contracts.length}</p>
+                <p>Liczba dodanych umów: {contracts.length}</p>
 
                 <div style={{ display: 'grid', gap: 12 }}>
-                    {contracts.map((contract) => {
-                        const isOpen = openedContractPath === contract.path;
-                        const isLoading = loadingPreviewPath === contract.path;
-                        const preview = contractPreviews[contract.path];
-
-                        return (
-                            <div
-                                key={contract.path}
-                                className={`contract-card ${isOpen ? 'open' : ''}`}
-                            >
-                                <div style={{ marginBottom: 8, fontWeight: 700 }}>{contract.fileName}</div>
-
-                                <div style={{ fontSize: 14, opacity: 0.85, marginBottom: 8 }}>
-                                    Ścieżka: {contract.path}
-                                </div>
-
-                                <div style={{ fontSize: 14, opacity: 0.85, marginBottom: 12 }}>
-                                    Ostatnia zmiana: {new Date(contract.updatedAt).toLocaleString('pl-PL')} | Rozmiar:{' '}
-                                    {contract.size} B
-                                </div>
-
-                                <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-                                    <button
-                                        className="submit navy"
-                                        type="button"
-                                        onClick={() => previewContract(contract.path)}
-                                        disabled={isLoading}
-                                        style={{ width: 'auto', paddingInline: 18 }}
-                                    >
-                                        {isOpen ? 'Zamknij podgląd' : 'Podgląd'}
-                                    </button>
-
-                                    <button
-                                        className="submit"
-                                        type="button"
-                                        onClick={() => downloadContract(contract.path)}
-                                        style={{ width: 'auto', paddingInline: 18 }}
-                                    >
-                                        Pobierz
-                                    </button>
-                                </div>
-
-                                {isOpen ? (
-                                    <div className="contract-preview">
-                                        <div className="contract-preview-header">
-                                            <strong>Podgląd umowy</strong>
-                                            <span>
-                                                                    {preview
-                                                                        ? `${preview.fileName} • ${preview.size} B`
-                                                                        : 'Wczytywanie treści...'}
-                                                                </span>
-                                        </div>
-
-                                        <div className="contract-preview-body">
-                                            {isLoading
-                                                ? 'Wczytywanie...'
-                                                : preview?.content || 'Brak treści podglądu.'}
-                                        </div>
-                                    </div>
-                                ) : null}
+                    {contracts.map((contract) => (
+                        <div
+                            key={contract.id}
+                            className="contract-card"
+                        >
+                            <div style={{ marginBottom: 8, fontWeight: 700, fontSize: 18 }}>
+                                {contract.enrollment.firstName} {contract.enrollment.lastName}
                             </div>
-                        );
-                    })}
 
-                    {contracts.length === 0 ? <p>Brak plików umów w folderze storage.</p> : null}
+                            <div style={{ fontSize: 14, opacity: 0.9, marginBottom: 6 }}>
+                                <strong>Kategoria:</strong> {contract.enrollment.courseCategory.name}
+                            </div>
+
+                            <div style={{ fontSize: 14, opacity: 0.9, marginBottom: 6 }}>
+                                <strong>Tryb kursu:</strong>{' '}
+                                {contract.enrollment.courseMode === 'ELEARNING'
+                                    ? 'e-learning'
+                                    : 'stacjonarny'}
+                            </div>
+
+                            <div style={{ fontSize: 14, opacity: 0.9, marginBottom: 6 }}>
+                                <strong>Plik:</strong> {contract.originalFileName}
+                            </div>
+
+                            <div style={{ fontSize: 14, opacity: 0.9, marginBottom: 12 }}>
+                                <strong>Dodano:</strong> {new Date(contract.createdAt).toLocaleString('pl-PL')} |{' '}
+                                <strong>Rozmiar:</strong> {contract.sizeBytes} B |{' '}
+                                <strong>Źródło:</strong> {contract.source === 'STUDENT' ? 'kursant' : 'admin'}
+                            </div>
+
+                            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                                <button
+                                    className="submit"
+                                    type="button"
+                                    onClick={() => downloadContract(contract.id, contract.originalFileName)}
+                                    style={{ width: 'auto', paddingInline: 18 }}
+                                >
+                                    Pobierz
+                                </button>
+                            </div>
+                        </div>
+                    ))}
+
+                    {contracts.length === 0 ? <p>Brak dodanych umów.</p> : null}
                 </div>
             </section>
         </div>

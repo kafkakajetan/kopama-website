@@ -33,9 +33,9 @@ export class AdminController {
   }
 
   @Get('contracts/download')
-  downloadContract(@Query('path') relativePath: string, @Res() res: Response) {
-    const absolutePath = this.admin.getContractAbsolutePath(relativePath);
-    return res.download(absolutePath);
+  async downloadContract(@Query('id') id: string, @Res() res: Response) {
+    const file = await this.admin.getUploadedContractAbsolutePath(id);
+    return res.download(file.absolutePath, file.fileName);
   }
 
   @Get('instructors')
