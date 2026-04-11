@@ -16,7 +16,7 @@ type Student = {
     lastName: string;
     email: string;
     phone: string | null;
-    status: 'DRAFT' | 'PAYMENT_PENDING' | 'PAID' | 'CANCELED';
+    status: 'DRAFT' | 'PAYMENT_PENDING' | 'CASH_PENDING' | 'PAID' | 'CANCELED';
     wantsCashPayment: boolean;
     courseCategory: {
         name: string;
@@ -180,21 +180,27 @@ export default function AdminStudentsPage() {
                                             display: 'inline-block',
                                             padding: '6px 10px',
                                             borderRadius: 999,
-                                            fontWeight: 700,
-                                            color: student.status === 'PAID'
-                                                ? '#166534'
-                                                : student.wantsCashPayment
-                                                    ? '#b42318'
-                                                    : '#b54708',
+                                            fontWeight: 400,
+                                            fontSize: '12px',
+                                            color:
+                                                student.status === 'PAID'
+                                                    ? '#166534'
+                                                    : student.status === 'CASH_PENDING'
+                                                        ? '#b42318'
+                                                        : '#b54708',
                                             background:
                                                 student.status === 'PAID'
                                                     ? '#dcfce7'
-                                                    : student.wantsCashPayment
+                                                    : student.status === 'CASH_PENDING'
                                                         ? '#fee4e2'
                                                         : '#ffedd5',
                                         }}
                                     >
-                                        {student.status === 'PAID' ? 'OPŁACONY' : 'TRWA'}
+                                        {student.status === 'PAID'
+                                            ? 'OPŁACONY'
+                                            : student.status === 'CASH_PENDING'
+                                                ? 'GOTÓWKA'
+                                                : 'TRWA'}
                                     </span>
                                 </td>
                             </tr>

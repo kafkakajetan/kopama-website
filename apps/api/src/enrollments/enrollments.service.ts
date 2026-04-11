@@ -204,7 +204,7 @@ export class EnrollmentsService {
 
     let createdEnrollment = await this.prisma.enrollment.create({
       data: {
-        status: 'PAYMENT_PENDING',
+        status: dto.wantsCashPayment ? 'CASH_PENDING' : 'PAYMENT_PENDING',
         firstName: dto.firstName,
         lastName: dto.lastName,
         email: normalizedEmail,

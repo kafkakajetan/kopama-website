@@ -339,7 +339,7 @@ export default function PanelPage() {
                                                     opacity: uploadingEnrollmentId === enrollment.id ? 0.7 : 1,
                                                 }}
                                             >
-                                                {uploadingEnrollmentId === enrollment.id ? 'Wgrywanie...' : 'Dodaj umowę'}
+                                                {uploadingEnrollmentId === enrollment.id ? 'Wgrywanie...' : 'Wgraj podpisaną umowę'}
                                                 <input
                                                     type="file"
                                                     accept="application/pdf,.pdf"
