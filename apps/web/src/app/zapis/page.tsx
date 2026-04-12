@@ -48,6 +48,7 @@ type CreateEnrollmentPayload = {
     email: string;
     phone: string;
     pesel: string;
+    pkkNumber: string;
     addressLine1: string;
     addressLine2?: string;
     city: string;
@@ -294,6 +295,7 @@ export default function ZapisPage() {
         email: '',
         phone: '',
         pesel: '',
+        pkkNumber: '',
         addressLine1: '',
         addressLine2: '',
         city: '',
@@ -626,6 +628,7 @@ export default function ZapisPage() {
             if (!form.firstName || !form.lastName) return 'Uzupełnij imię i nazwisko.';
             if (!/^\+48\d{9}$/.test(form.phone)) return 'Telefon musi mieć format +48 i 9 cyfr.';
             if (!/^\d{11}$/.test(form.pesel)) return 'PESEL musi mieć 11 cyfr.';
+            if (!/^\d{20}$/.test(form.pkkNumber)) return 'Numer PKK musi mieć 20 cyfr.';
             if (!/^\d{2}-\d{3}$/.test(form.postalCode)) return 'Kod pocztowy musi mieć format 00-000.';
             if (!isElearning && !form.courseStartDate) {
                 return 'Wybierz termin rozpoczęcia kursu.';
@@ -704,6 +707,7 @@ export default function ZapisPage() {
                 otherDrivingLicenseNumber: form.otherDrivingLicenseNumber.trim(),
                 tramPermitNumber: form.tramPermitNumber.trim(),
                 pesel: digitsOnly(form.pesel).slice(0, 11),
+                pkkNumber: digitsOnly(form.pkkNumber).slice(0, 20),
                 email: sanitizeEmail(form.email),
                 postalCode: formatPostalCode(form.postalCode),
             };
@@ -1091,16 +1095,27 @@ export default function ZapisPage() {
                                                 />
                                             </div>
                                             <div>
-                                                <label>Kod pocztowy</label>
+                                                <label>Numer PKK</label>
                                                 <input
-                                                    value={formatPostalCode(form.postalCode)}
-                                                    onChange={(e) => set('postalCode', formatPostalCode(e.target.value))}
+                                                    value={form.pkkNumber}
+                                                    onChange={(e) => set('pkkNumber', digitsOnly(e.target.value).slice(0, 20))}
                                                     inputMode="numeric"
-                                                    autoComplete="postal-code"
-                                                    placeholder="00-000"
-                                                    maxLength={6}
+                                                    maxLength={20}
+                                                    placeholder="20 cyfr"
                                                 />
                                             </div>
+                                        </div>
+
+                                        <div>
+                                            <label>Kod pocztowy</label>
+                                            <input
+                                                value={formatPostalCode(form.postalCode)}
+                                                onChange={(e) => set('postalCode', formatPostalCode(e.target.value))}
+                                                inputMode="numeric"
+                                                autoComplete="postal-code"
+                                                placeholder="00-000"
+                                                maxLength={6}
+                                            />
                                         </div>
 
                                         <div>
@@ -1459,6 +1474,7 @@ export default function ZapisPage() {
                                                     <strong>Kurs:</strong> {selectedOffer?.name ?? form.offerItemCode}
                                                 </p>
                                                 <p className="wizMeta"><strong>Email:</strong> {form.email}</p>
+                                                <p className="wizMeta"><strong>Numer PKK:</strong> {form.pkkNumber}</p>
                                                 <p className="wizMeta">
                                                     <strong>Termin:</strong> {form.courseStartDate ? formatCourseStartDateLabel(form.courseStartDate) : '-'}
                                                 </p>
