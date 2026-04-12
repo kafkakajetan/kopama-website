@@ -376,8 +376,10 @@ export default function ZapisPage() {
         if (!returnedEnrollmentId) return;
 
         let cancelled = false;
+        let attempts = 0;
+        let timeoutId: ReturnType<typeof setTimeout> | null = null;
 
-        const restorePaymentStep = async () => {
+        const checkStatus = async () => {
             try {
                 const res = await fetch(
                     `${API_URL}/payments/p24/enrollments/${encodeURIComponent(returnedEnrollmentId)}/status`,
@@ -385,6 +387,10 @@ export default function ZapisPage() {
                 );
 
                 if (!res.ok) {
+                    if (!cancelled && attempts < 10) {
+                        attempts += 1;
+                        timeoutId = setTimeout(checkStatus, 3000);
+                    }
                     return;
                 }
 
@@ -404,18 +410,32 @@ export default function ZapisPage() {
                     });
                     setError('');
                     setStep(5);
-                } else {
-                    setStep(4);
-                    setError('Płatność nie została jeszcze potwierdzona. Odczekaj chwilę i spróbuj ponownie.');
+                    return;
                 }
+
+                if (attempts < 10) {
+                    attempts += 1;
+                    setStep(4);
+                    setError('Trwa potwierdzanie płatności. Proszę chwilę poczekać...');
+                    timeoutId = setTimeout(checkStatus, 3000);
+                    return;
+                }
+
+                setStep(4);
+                setError('Płatność nie została jeszcze potwierdzona. Odczekaj chwilę i spróbuj ponownie.');
             } catch {
+                if (!cancelled && attempts < 10) {
+                    attempts += 1;
+                    timeoutId = setTimeout(checkStatus, 3000);
+                }
             }
         };
 
-        void restorePaymentStep();
+        void checkStatus();
 
         return () => {
             cancelled = true;
+            if (timeoutId) clearTimeout(timeoutId);
         };
     }, [API_URL, loading]);
 
