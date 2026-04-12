@@ -236,6 +236,7 @@ export class EnrollmentsService {
         userId: existingUser?.id ?? null,
         phone: dto.phone,
         pesel: dto.pesel,
+        pkkNumber: dto.pkkNumber,
         addressLine1: dto.addressLine1,
         addressLine2: dto.addressLine2 ?? null,
         city: dto.city,

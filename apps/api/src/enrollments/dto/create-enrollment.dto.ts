@@ -48,6 +48,10 @@ export class CreateEnrollmentDto {
   pesel!: string;
 
   @Transform((p: TransformFnParams) => trimString(p))
+  @Matches(/^\d{20}$/)
+  pkkNumber!: string;
+
+  @Transform((p: TransformFnParams) => trimString(p))
   @IsString()
   @MinLength(3)
   @MaxLength(120)
