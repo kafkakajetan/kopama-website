@@ -400,13 +400,34 @@ export default function ZapisPage() {
 
                 setEnrollmentId(data.enrollmentId);
 
+                const cachedLoginRaw = sessionStorage.getItem(
+                    `enrollment-login-${data.enrollmentId}`,
+                );
+
+                let cachedLogin:
+                    | { email: string; tempPassword?: string; userCreated: boolean }
+                    | null = null;
+
+                if (cachedLoginRaw) {
+                    try {
+                        cachedLogin = JSON.parse(cachedLoginRaw) as {
+                            email: string;
+                            tempPassword?: string;
+                            userCreated: boolean;
+                        };
+                    } catch {
+                        cachedLogin = null;
+                    }
+                }
+
                 if (data.paid) {
                     setCashAccount(null);
                     setMockPay({
                         ok: true,
                         enrollmentId: data.enrollmentId,
-                        email: data.email,
-                        userCreated: false,
+                        email: cachedLogin?.email ?? data.email,
+                        userCreated: cachedLogin?.userCreated === true,
+                        tempPassword: cachedLogin?.tempPassword,
                     });
                     setError('');
                     setStep(5);
@@ -745,6 +766,17 @@ export default function ZapisPage() {
             if (!created) throw new Error('Nie udało się odczytać id zapisu.');
 
             setEnrollmentId(created.id);
+
+            if (created.userCreated && created.tempPassword) {
+                sessionStorage.setItem(
+                    `enrollment-login-${created.id}`,
+                    JSON.stringify({
+                        email: created.email,
+                        tempPassword: created.tempPassword,
+                        userCreated: true,
+                    }),
+                );
+            }
 
             if (form.wantsCashPayment) {
                 setMockPay(null);

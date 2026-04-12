@@ -310,7 +310,7 @@ export class EnrollmentsService {
     let tempPassword: string | undefined;
     let userCreated = false;
 
-    if (dto.wantsCashPayment && !existingUser) {
+    if (!existingUser) {
       tempPassword = `Test${randomBytes(3).toString('hex')}!1`;
       const passwordHash = await this.auth.hashPassword(tempPassword);
 
@@ -340,7 +340,8 @@ export class EnrollmentsService {
 
     return {
       ...createdEnrollment,
-      ...(dto.wantsCashPayment ? { userCreated, tempPassword } : {}),
+      userCreated,
+      tempPassword,
     };
   }
 
