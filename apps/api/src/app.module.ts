@@ -15,7 +15,7 @@ import { PaymentsModule } from './payments/payments.module';
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      envFilePath: ['apps/api/.env', '.env'],
+      envFilePath: '/var/www/kopama/kopama-website/apps/api/.env',
     }),
     PrismaModule,
     CourseCategoriesModule,
