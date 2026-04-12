@@ -180,14 +180,27 @@ function sanitizeEmail(value: string): string {
     return value.trim().toLowerCase().replace(/\s+/g, '');
 }
 
+
 function getOfferFamilyKey(offer: OfferItem): string {
     if (offer.code.includes('AFTER_B1')) return `${offer.language}_AFTER_B1`;
     if (offer.code.includes('INDIVIDUAL')) return `${offer.language}_INDIVIDUAL`;
     if (offer.code.includes('NO_THEORY')) return `${offer.language}_NO_THEORY`;
-    return `${offer.language}_B`;
+    if (
+        offer.code === 'COURSE_B' ||
+        offer.code === 'COURSE_B_AUT' ||
+        offer.code === 'COURSE_B_EN' ||
+        offer.code === 'COURSE_B_AUT_EN'
+    ) {
+        return `${offer.language}_B_BASIC`;
+    }
+
+    return `${offer.language}_${offer.code}`;
 }
 
-function getResolvedFullPrice(offer: OfferItem | null, courseMode: 'STATIONARY' | 'ELEARNING'): string | null {
+function getResolvedFullPrice(
+    offer: OfferItem | null,
+    courseMode: 'STATIONARY' | 'ELEARNING',
+): string | null {
     if (!offer) return null;
 
     if (courseMode === 'ELEARNING') {
@@ -197,7 +210,10 @@ function getResolvedFullPrice(offer: OfferItem | null, courseMode: 'STATIONARY' 
     return offer.fullPriceZloty ?? getPublicPrice(offer);
 }
 
-function getResolvedFirstInstallmentPrice(offer: OfferItem | null, courseMode: 'STATIONARY' | 'ELEARNING'): string | null {
+function getResolvedFirstInstallmentPrice(
+    offer: OfferItem | null,
+    courseMode: 'STATIONARY' | 'ELEARNING',
+): string | null {
     if (!offer) return null;
 
     if (courseMode === 'ELEARNING') {
@@ -207,7 +223,10 @@ function getResolvedFirstInstallmentPrice(offer: OfferItem | null, courseMode: '
     return offer.firstInstallmentPriceZloty ?? null;
 }
 
-function getResolvedInstallmentsTotalPrice(offer: OfferItem | null, courseMode: 'STATIONARY' | 'ELEARNING'): string | null {
+function getResolvedInstallmentsTotalPrice(
+    offer: OfferItem | null,
+    courseMode: 'STATIONARY' | 'ELEARNING',
+): string | null {
     if (!offer) return null;
 
     if (courseMode === 'ELEARNING') {
@@ -345,16 +364,7 @@ export default function ZapisPage() {
     );
 
     const displayCourseOffers = useMemo(() => {
-        const map = new Map<string, OfferItem>();
-
-        for (const offer of courseOffers) {
-            const key = getOfferFamilyKey(offer);
-            if (!map.has(key)) {
-                map.set(key, offer);
-            }
-        }
-
-        return Array.from(map.values());
+        return courseOffers;
     }, [courseOffers]);
 
     const selectedGearbox: GearboxType =
