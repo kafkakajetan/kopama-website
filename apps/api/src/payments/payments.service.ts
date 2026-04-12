@@ -24,6 +24,26 @@ type P24RegisterResponse = {
   message?: unknown;
 } | null;
 
+type P24VerifyResponse = {
+  data?: {
+    status?: unknown;
+  };
+  error?: unknown;
+  message?: unknown;
+} | null;
+
+type P24StatusNotificationBody = {
+  merchantId?: unknown;
+  posId?: unknown;
+  sessionId?: unknown;
+  amount?: unknown;
+  currency?: unknown;
+  orderId?: unknown;
+  methodId?: unknown;
+  statement?: unknown;
+  sign?: unknown;
+};
+
 @Injectable()
 export class PaymentsService {
   constructor(
@@ -39,6 +59,8 @@ export class PaymentsService {
     const baseUrl = this.requireEnv('P24_BASE_URL');
     const returnUrl = this.requireEnv('P24_RETURN_URL');
     const statusUrl = this.requireEnv('P24_STATUS_URL');
+    const paymentBaseUrl =
+      this.config.get<string>('P24_PAYMENT_BASE_URL')?.trim() || baseUrl;
     const sandbox = this.config.get<string>('P24_SANDBOX') === 'true';
 
     return {
@@ -49,6 +71,7 @@ export class PaymentsService {
       baseUrl,
       returnUrl,
       statusUrl,
+      paymentBaseUrl,
       sandbox,
     };
   }
@@ -88,29 +111,13 @@ export class PaymentsService {
       throw new BadRequestException('Ten zapis jest już opłacony.');
     }
 
-    const publicPriceRule = enrollment.offerItem.priceRules.find(
-      (rule) => rule.customerType === 'PUBLIC',
-    );
+    const { amountGrosze, currency, description } =
+      this.resolveEnrollmentPaymentData(enrollment);
 
-    if (!publicPriceRule) {
-      throw new BadRequestException(
-        'Brak ceny publicznej dla wybranego kursu.',
-      );
-    }
+    const { merchantId, posId, baseUrl, returnUrl, statusUrl, paymentBaseUrl } =
+      this.getConfig();
 
-    const amountGrosze = this.priceZlotyToGrosze(
-      publicPriceRule.priceZloty.toString(),
-    );
-
-    const currency = 'PLN';
     const sessionId = `enrollment-${enrollment.id}-${Date.now()}`;
-
-    const config = this.getConfig();
-    const merchantId = config.merchantId;
-    const posId = config.posId;
-    const baseUrl = config.baseUrl;
-    const returnUrl = config.returnUrl;
-    const statusUrl = config.statusUrl;
 
     const sign = this.createRegisterSign({
       sessionId,
@@ -131,7 +138,7 @@ export class PaymentsService {
         sessionId,
         amount: amountGrosze,
         currency,
-        description: `Kurs ${enrollment.offerItem.name}`,
+        description,
         email: enrollment.email,
         client: `${enrollment.firstName} ${enrollment.lastName}`,
         address: enrollment.addressLine1,
@@ -141,7 +148,7 @@ export class PaymentsService {
         phone: enrollment.phone,
         language: enrollment.offerItem.language === 'EN' ? 'en' : 'pl',
         urlReturn: `${returnUrl}?enrollmentId=${encodeURIComponent(enrollment.id)}`,
-        urlStatus: `${statusUrl}?enrollmentId=${encodeURIComponent(enrollment.id)}`,
+        urlStatus: statusUrl,
         timeLimit: 15,
         sign,
       }),
@@ -194,10 +201,219 @@ export class PaymentsService {
 
     return {
       token,
-      paymentUrl: `${baseUrl}/trnRequest/${token}`,
+      paymentUrl: `${paymentBaseUrl.replace(/\/$/, '')}/trnRequest/${token}`,
       amountGrosze,
       currency,
       sessionId,
+    };
+  }
+
+  async handleStatusNotification(body: P24StatusNotificationBody) {
+    const sessionId =
+      typeof body.sessionId === 'string' ? body.sessionId.trim() : '';
+    const currency =
+      typeof body.currency === 'string' ? body.currency.trim() : '';
+    const sign = typeof body.sign === 'string' ? body.sign.trim() : '';
+    const amount = Number(body.amount);
+    const orderId = Number(body.orderId);
+
+    if (!sessionId || !currency || !sign) {
+      throw new BadRequestException(
+        'Brak wymaganych danych w powiadomieniu P24.',
+      );
+    }
+
+    if (Number.isNaN(amount) || Number.isNaN(orderId)) {
+      throw new BadRequestException(
+        'Nieprawidłowe dane kwoty lub orderId w powiadomieniu P24.',
+      );
+    }
+
+    const payment = await this.prisma.paymentTransaction.findUnique({
+      where: { p24SessionId: sessionId },
+      include: {
+        enrollment: {
+          include: {
+            offerItem: {
+              include: {
+                priceRules: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!payment) {
+      throw new BadRequestException(
+        'Nie znaleziono płatności dla podanego sessionId.',
+      );
+    }
+
+    const expectedPayment = this.resolveEnrollmentPaymentData(
+      payment.enrollment,
+    );
+
+    if (amount !== expectedPayment.amountGrosze) {
+      throw new BadRequestException(
+        'Kwota z webhooka nie zgadza się z zapisem.',
+      );
+    }
+
+    const expectedSign = this.createVerifySign({
+      sessionId,
+      orderId,
+      amount,
+      currency,
+    });
+
+    if (expectedSign !== sign) {
+      throw new BadRequestException(
+        'Nieprawidłowy podpis powiadomienia Przelewy24.',
+      );
+    }
+
+    if (payment.status === 'SUCCESS' && payment.enrollment.status === 'PAID') {
+      return { ok: true };
+    }
+
+    const { merchantId, posId, baseUrl } = this.getConfig();
+
+    const verifySign = this.createVerifySign({
+      sessionId,
+      orderId,
+      amount,
+      currency,
+    });
+
+    const verifyResponse = await fetch(`${baseUrl}/api/v1/transaction/verify`, {
+      method: 'PUT',
+      headers: {
+        Authorization: this.getAuthHeader(),
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        merchantId,
+        posId,
+        sessionId,
+        amount,
+        currency,
+        orderId,
+        sign: verifySign,
+      }),
+    });
+
+    const verifyBody = (await verifyResponse
+      .json()
+      .catch(() => null)) as P24VerifyResponse;
+
+    if (!verifyResponse.ok) {
+      await this.prisma.paymentTransaction.update({
+        where: { id: payment.id },
+        data: {
+          status: 'ERROR',
+          p24OrderId: String(orderId),
+          lastWebhookAt: new Date(),
+          rawPayload: body as Prisma.InputJsonValue,
+        },
+      });
+
+      const message =
+        typeof verifyBody?.error === 'string'
+          ? verifyBody.error
+          : typeof verifyBody?.message === 'string'
+            ? verifyBody.message
+            : 'Przelewy24 odrzuciło weryfikację płatności.';
+
+      throw new BadRequestException(message);
+    }
+
+    if (
+      typeof verifyBody?.data?.status === 'string' &&
+      verifyBody.data.status !== 'success'
+    ) {
+      throw new BadRequestException(
+        'Płatność nie została potwierdzona przez P24.',
+      );
+    }
+
+    await this.prisma.$transaction([
+      this.prisma.paymentTransaction.update({
+        where: { id: payment.id },
+        data: {
+          status: 'SUCCESS',
+          p24OrderId: String(orderId),
+          lastWebhookAt: new Date(),
+          rawPayload: body as Prisma.InputJsonValue,
+        },
+      }),
+      this.prisma.enrollment.update({
+        where: { id: payment.enrollmentId },
+        data: { status: 'PAID' },
+      }),
+    ]);
+
+    return { ok: true };
+  }
+
+  private resolveEnrollmentPaymentData(enrollment: {
+    wantsInstallments: boolean;
+    courseMode: 'STATIONARY' | 'ELEARNING';
+    offerItem: {
+      name: string;
+      fullPriceZloty?: { toString(): string } | string | null;
+      fullPriceElearningZloty?: { toString(): string } | string | null;
+      firstInstallmentPriceZloty?: { toString(): string } | string | null;
+      firstInstallmentPriceElearningZloty?:
+        | { toString(): string }
+        | string
+        | null;
+      priceRules: Array<{
+        customerType: string;
+        priceZloty: { toString(): string };
+      }>;
+    };
+  }) {
+    const publicPriceRule = enrollment.offerItem.priceRules.find(
+      (rule) => rule.customerType === 'PUBLIC',
+    );
+
+    const fallbackFullPrice = publicPriceRule?.priceZloty?.toString() ?? null;
+
+    const fullPriceRaw =
+      enrollment.courseMode === 'ELEARNING'
+        ? (this.decimalToString(enrollment.offerItem.fullPriceElearningZloty) ??
+          this.decimalToString(enrollment.offerItem.fullPriceZloty) ??
+          fallbackFullPrice)
+        : (this.decimalToString(enrollment.offerItem.fullPriceZloty) ??
+          fallbackFullPrice);
+
+    const firstInstallmentRaw =
+      enrollment.courseMode === 'ELEARNING'
+        ? (this.decimalToString(
+            enrollment.offerItem.firstInstallmentPriceElearningZloty,
+          ) ??
+          this.decimalToString(enrollment.offerItem.firstInstallmentPriceZloty))
+        : this.decimalToString(enrollment.offerItem.firstInstallmentPriceZloty);
+
+    const selectedPrice = enrollment.wantsInstallments
+      ? firstInstallmentRaw
+      : fullPriceRaw;
+
+    if (!selectedPrice) {
+      throw new BadRequestException(
+        enrollment.wantsInstallments
+          ? 'Brak ceny pierwszej raty dla wybranego kursu.'
+          : 'Brak pełnej ceny dla wybranego kursu.',
+      );
+    }
+
+    return {
+      amountGrosze: this.priceZlotyToGrosze(selectedPrice),
+      currency: 'PLN',
+      description: enrollment.wantsInstallments
+        ? `I rata kursu ${enrollment.offerItem.name}`
+        : `Kurs ${enrollment.offerItem.name}`,
     };
   }
 
@@ -218,6 +434,32 @@ export class PaymentsService {
     });
 
     return createHash('sha384').update(payload, 'utf8').digest('hex');
+  }
+
+  private createVerifySign(input: {
+    sessionId: string;
+    orderId: number;
+    amount: number;
+    currency: string;
+  }) {
+    const { crc } = this.getConfig();
+
+    const payload = JSON.stringify({
+      sessionId: input.sessionId,
+      orderId: input.orderId,
+      amount: input.amount,
+      currency: input.currency,
+      crc,
+    });
+
+    return createHash('sha384').update(payload, 'utf8').digest('hex');
+  }
+
+  private decimalToString(
+    value?: { toString(): string } | string | null,
+  ): string | null {
+    if (value == null) return null;
+    return typeof value === 'string' ? value : value.toString();
   }
 
   private priceZlotyToGrosze(priceZloty: string) {
