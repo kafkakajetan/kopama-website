@@ -1,74 +1,69 @@
 import { Injectable } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import { mkdir, readFile, writeFile } from 'fs/promises';
+import { copyFile, mkdir } from 'fs/promises';
 import * as path from 'path';
-import { PDFDocument, PageSizes, rgb } from 'pdf-lib';
-import fontkit from '@pdf-lib/fontkit';
+import {
+  CourseMode,
+  OfferLanguage,
+  type Enrollment,
+  type OfferItem,
+} from '@prisma/client';
+import { ContractTemplateResolver } from './contract-template.resolver';
 
-export type TestContractPdfInput = {
+export type GeneratedPdfFile = {
+  fileName: string;
+  absolutePath: string;
+  relativePath: string;
+};
+
+export type EnrollmentDocumentsInput = {
   fileId: string;
-  fullName: string;
-  email: string;
-  phone: string;
-  pesel: string;
-  address: string;
-  courseName: string;
+  offerItemCode: string;
+  offerLanguage: OfferLanguage;
+  courseMode: CourseMode;
+  wantsInstallments: boolean;
   generatedAt?: Date;
+};
+
+export type EnrollmentDocumentsResult = {
+  contract: GeneratedPdfFile;
+  rodo: GeneratedPdfFile;
+};
+
+type ResolverEnrollment = Pick<
+  Enrollment,
+  'courseMode' | 'wantsInstallments'
+> & {
+  offerItem: Pick<OfferItem, 'code' | 'language'>;
 };
 
 @Injectable()
 export class ContractPdfService {
-  constructor(private readonly config: ConfigService) {}
+  constructor(
+    private readonly contractTemplateResolver: ContractTemplateResolver,
+  ) {}
 
-  async generateTestContractPdf(input: TestContractPdfInput) {
-    const pdfDoc = await PDFDocument.create();
-    pdfDoc.registerFontkit(fontkit);
-
-    const fontPath = this.getFontPath();
-    const fontBytes = await readFile(fontPath);
-    const font = await pdfDoc.embedFont(fontBytes);
-
-    const page = pdfDoc.addPage(PageSizes.A4);
-    const { height } = page.getSize();
-
-    page.drawText('KopaMa – umowa testowa', {
-      x: 50,
-      y: height - 60,
-      size: 20,
-      font,
-      color: rgb(0, 0, 0),
-    });
-
+  async generateEnrollmentDocuments(
+    input: EnrollmentDocumentsInput,
+  ): Promise<EnrollmentDocumentsResult> {
     const generatedAt = input.generatedAt ?? new Date();
 
-    const lines = [
-      'Dokument testowy – do podmiany na finalny wzór.',
-      '',
-      `Data wygenerowania: ${generatedAt.toLocaleString('pl-PL')}`,
-      '',
-      `Imię i nazwisko: ${input.fullName}`,
-      `Email: ${input.email}`,
-      `Telefon: ${input.phone}`,
-      `PESEL: ${input.pesel}`,
-      `Adres: ${input.address}`,
-      `Kurs: ${input.courseName}`,
-      '',
-      'Oświadczenie:',
-      'Kursant potwierdza chęć zawarcia umowy na realizację szkolenia.',
-      'To jest wersja testowa PDF przygotowana do wdrożenia dalszego obiegu.',
-    ];
+    const resolverEnrollment: ResolverEnrollment = {
+      courseMode: input.courseMode,
+      wantsInstallments: input.wantsInstallments,
+      offerItem: {
+        code: input.offerItemCode,
+        language: input.offerLanguage,
+      },
+    };
 
-    let y = height - 110;
-    for (const line of lines) {
-      page.drawText(line, {
-        x: 50,
-        y,
-        size: 12,
-        font,
-        color: rgb(0, 0, 0),
-      });
-      y -= 18;
-    }
+    const contractTemplatePath =
+      this.contractTemplateResolver.resolveContractTemplate(
+        resolverEnrollment as Enrollment & { offerItem: OfferItem },
+      );
+
+    const rodoTemplatePath = this.contractTemplateResolver.resolveRodoTemplate(
+      resolverEnrollment as Enrollment & { offerItem: OfferItem },
+    );
 
     const storageRoot = this.getStorageRoot();
     const year = String(generatedAt.getFullYear());
@@ -77,17 +72,41 @@ export class ContractPdfService {
     const dir = path.join(storageRoot, 'contracts', year, month);
     await mkdir(dir, { recursive: true });
 
-    const fileName = `umowa-testowa-${input.fileId}.pdf`;
-    const absolutePath = path.join(dir, fileName);
+    const contractFile = await this.copyTemplateToOutput({
+      templateAbsolutePath: contractTemplatePath,
+      outputDir: dir,
+      outputFileName: `umowa-${input.fileId}.pdf`,
+      storageRoot,
+    });
 
-    const pdfBytes = await pdfDoc.save();
-    await writeFile(absolutePath, pdfBytes);
+    const rodoFile = await this.copyTemplateToOutput({
+      templateAbsolutePath: rodoTemplatePath,
+      outputDir: dir,
+      outputFileName: `rodo-${input.fileId}.pdf`,
+      storageRoot,
+    });
 
     return {
-      fileName,
+      contract: contractFile,
+      rodo: rodoFile,
+    };
+  }
+
+  private async copyTemplateToOutput(params: {
+    templateAbsolutePath: string;
+    outputDir: string;
+    outputFileName: string;
+    storageRoot: string;
+  }): Promise<GeneratedPdfFile> {
+    const absolutePath = path.join(params.outputDir, params.outputFileName);
+
+    await copyFile(params.templateAbsolutePath, absolutePath);
+
+    return {
+      fileName: params.outputFileName,
       absolutePath,
       relativePath: path
-        .relative(storageRoot, absolutePath)
+        .relative(params.storageRoot, absolutePath)
         .split(path.sep)
         .join('/'),
     };
@@ -97,14 +116,5 @@ export class ContractPdfService {
     const candidateA = path.resolve(process.cwd(), 'storage');
     const candidateB = path.resolve(process.cwd(), '..', '..', 'storage');
     return path.basename(candidateA) === 'storage' ? candidateA : candidateB;
-  }
-
-  private getFontPath() {
-    const configured = this.config.get<string>('PDF_FONT_PATH');
-    if (configured) {
-      return path.resolve(process.cwd(), configured);
-    }
-
-    return path.resolve(process.cwd(), 'assets', 'fonts', 'arial.ttf');
   }
 }
