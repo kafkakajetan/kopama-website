@@ -45,6 +45,11 @@ enum UploadedContractSource {
   ADMIN
 }
 
+enum GearboxType {
+  MANUAL
+  AUTOMATIC
+}
+
 model User {
   id              String           @id @default(cuid())
   createdAt       DateTime         @default(now())
@@ -110,7 +115,8 @@ model Enrollment {
   hasTramPermit     Boolean @default(false)
   tramPermitNumber  String?
 
-  wantsCashPayment  Boolean @default(false)
+  wantsCashPayment   Boolean @default(false)
+  wantsInstallments  Boolean @default(false)
 
   isMinorAtPurchase Boolean @default(false)
 
@@ -247,6 +253,14 @@ model OfferItem {
   courseCategory   CourseCategory? @relation(fields: [courseCategoryId], references: [id])
 
   language OfferLanguage @default(PL)
+  gearboxType GearboxType?
+
+  fullPriceZloty                      Decimal? @db.Decimal(10, 2)
+  fullPriceElearningZloty             Decimal? @db.Decimal(10, 2)
+  firstInstallmentPriceZloty          Decimal? @db.Decimal(10, 2)
+  firstInstallmentPriceElearningZloty Decimal? @db.Decimal(10, 2)
+  installmentsTotalPriceZloty         Decimal? @db.Decimal(10, 2)
+  installmentsTotalPriceElearningZloty Decimal? @db.Decimal(10, 2)
 
   enrollments Enrollment[]
 
