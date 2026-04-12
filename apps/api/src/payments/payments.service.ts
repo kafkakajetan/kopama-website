@@ -8,6 +8,7 @@ import {
 import { ConfigService } from '@nestjs/config';
 import type { Prisma } from '@prisma/client';
 import { createHash } from 'crypto';
+import { EnrollmentsService } from '../enrollments/enrollments.service';
 import { PrismaService } from '../prisma/prisma.service';
 
 export type RegisterEnrollmentPaymentResult = {
@@ -53,6 +54,7 @@ export class PaymentsService {
   constructor(
     private readonly config: ConfigService,
     private readonly prisma: PrismaService,
+    private readonly enrollmentsService: EnrollmentsService,
   ) {}
 
   getConfig() {
@@ -353,15 +355,12 @@ export class PaymentsService {
       },
     });
 
-    await this.prisma.enrollment.update({
-      where: { id: payment.enrollmentId },
-      data: {
-        status: 'PAID',
-      },
-    });
+    const completed = await this.enrollmentsService.completePaidEnrollment(
+      payment.enrollmentId,
+    );
 
     this.logger.log(
-      `P24 verify success: enrollmentId=${payment.enrollmentId}, orderId=${orderId}`,
+      `P24 verify success: enrollmentId=${payment.enrollmentId}, orderId=${orderId}, userCreated=${completed.userCreated}`,
     );
 
     return { ok: true };

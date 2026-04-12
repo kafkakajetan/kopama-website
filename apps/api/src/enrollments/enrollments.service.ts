@@ -1,7 +1,9 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
 import { randomBytes } from 'crypto';
 import { AuthService } from '../auth/auth.service';
+import { ContractPdfService } from '../contracts/contract-pdf.service';
+import { MailService } from '../mail/mail.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateEnrollmentDto } from './dto/create-enrollment.dto';
 import { CourseStartSlotsService } from '../course-start-slots/course-start-slots.service';
@@ -37,9 +39,13 @@ export type CreateEnrollmentResult = EnrollmentWithCategory & {
 
 @Injectable()
 export class EnrollmentsService {
+  private readonly logger = new Logger(EnrollmentsService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly auth: AuthService,
+    private readonly contractPdf: ContractPdfService,
+    private readonly mailService: MailService,
     private readonly courseStartSlotsService: CourseStartSlotsService,
   ) {}
 
@@ -236,7 +242,7 @@ export class EnrollmentsService {
         userId: existingUser?.id ?? null,
         phone: dto.phone,
         pesel: dto.pesel,
-        pkkNumber: dto.pkkNumber,
+        pkkNumber: dto.pkkNumber?.trim() || null,
         addressLine1: dto.addressLine1,
         addressLine2: dto.addressLine2 ?? null,
         city: dto.city,
@@ -346,7 +352,7 @@ export class EnrollmentsService {
     };
   }
 
-  async mockPay(enrollmentId: string): Promise<MockPayResult> {
+  async completePaidEnrollment(enrollmentId: string): Promise<MockPayResult> {
     const enrollment = await this.prisma.enrollment.findUnique({
       where: { id: enrollmentId },
       include: { offerItem: true },
@@ -370,7 +376,7 @@ export class EnrollmentsService {
 
     let tempPassword: string | undefined;
     let userCreated = false;
-    let linkedUserId = existingUser?.id ?? null;
+    let linkedUserId = existingUser?.id ?? enrollment.userId ?? null;
 
     if (!existingUser) {
       tempPassword = `Test${randomBytes(3).toString('hex')}!1`;
@@ -392,11 +398,53 @@ export class EnrollmentsService {
       userCreated = true;
     }
 
-    if (linkedUserId) {
+    if (linkedUserId && enrollment.userId !== linkedUserId) {
       await this.prisma.enrollment.update({
         where: { id: enrollmentId },
         data: { userId: linkedUserId },
       });
+    }
+
+    const documents = await this.contractPdf.generateEnrollmentDocuments({
+      fileId: enrollment.id,
+      offerItemCode: enrollment.offerItem.code,
+      offerLanguage: enrollment.offerItem.language,
+      courseMode: enrollment.courseMode,
+      wantsInstallments: enrollment.wantsInstallments,
+    });
+
+    await this.prisma.contractDocument.upsert({
+      where: { enrollmentId: enrollment.id },
+      update: {
+        status: 'GENERATED',
+        storageKey: documents.contract.relativePath,
+        generatedAt: new Date(),
+        templateVer: 'v1',
+      },
+      create: {
+        enrollmentId: enrollment.id,
+        status: 'GENERATED',
+        storageKey: documents.contract.relativePath,
+        generatedAt: new Date(),
+        templateVer: 'v1',
+        fileHash: null,
+      },
+    });
+
+    const fullName = `${enrollment.firstName} ${enrollment.lastName}`;
+
+    try {
+      await this.mailService.sendContractEmail({
+        to: email,
+        fullName,
+        contractAbsolutePath: documents.contract.absolutePath,
+        rodoAbsolutePath: documents.rodo.absolutePath,
+        loginEmail: userCreated ? email : undefined,
+        plainPassword: userCreated ? tempPassword : undefined,
+        isMinor: enrollment.isMinorAtPurchase,
+      });
+    } catch (error: unknown) {
+      this.logger.error('Nie udało się wysłać maila z umową i RODO.', error);
     }
 
     return {
@@ -406,5 +454,9 @@ export class EnrollmentsService {
       userCreated,
       tempPassword,
     };
+  }
+
+  async mockPay(enrollmentId: string): Promise<MockPayResult> {
+    return this.completePaidEnrollment(enrollmentId);
   }
 }
