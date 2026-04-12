@@ -2,7 +2,6 @@
 
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
-import { useSearchParams } from 'next/navigation';
 import Image from "next/image";
 
 type PriceRule = {
@@ -272,7 +271,6 @@ export default function ZapisPage() {
         tempPassword?: string;
     } | null>(null);
     const [courseLanguage, setCourseLanguage] = useState<CourseLanguage>('PL');
-    const searchParams = useSearchParams();
 
     const [offers, setOffers] = useState<OfferItem[]>([]);
     const courseOffers = useMemo(
@@ -371,8 +369,10 @@ export default function ZapisPage() {
     useEffect(() => {
         if (!API_URL) return;
         if (loading) return;
+        if (typeof window === 'undefined') return;
 
-        const returnedEnrollmentId = searchParams.get('enrollmentId');
+        const params = new URLSearchParams(window.location.search);
+        const returnedEnrollmentId = params.get('enrollmentId');
         if (!returnedEnrollmentId) return;
 
         let cancelled = false;
@@ -417,7 +417,7 @@ export default function ZapisPage() {
         return () => {
             cancelled = true;
         };
-    }, [API_URL, loading, searchParams]);
+    }, [API_URL, loading]);
 
     const selectedOffer = useMemo(
         () => courseOffers.find((o) => o.code === form.offerItemCode) ?? null,
