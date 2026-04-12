@@ -2,6 +2,7 @@ import {
   BadRequestException,
   Injectable,
   InternalServerErrorException,
+  NotFoundException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { Prisma } from '@prisma/client';
@@ -147,7 +148,7 @@ export class PaymentsService {
         country: 'PL',
         phone: enrollment.phone,
         language: enrollment.offerItem.language === 'EN' ? 'en' : 'pl',
-        urlReturn: `${returnUrl}?enrollmentId=${encodeURIComponent(enrollment.id)}`,
+        urlReturn: `${returnUrl}?enrollmentId=${encodeURIComponent(enrollment.id)}&p24=return`,
         urlStatus: statusUrl,
         timeLimit: 15,
         sign,
@@ -482,5 +483,28 @@ export class PaymentsService {
     }
 
     return value.trim();
+  }
+
+  async getEnrollmentPaymentStatus(enrollmentId: string) {
+    const enrollment = await this.prisma.enrollment.findUnique({
+      where: { id: enrollmentId },
+      include: {
+        payment: true,
+      },
+    });
+
+    if (!enrollment) {
+      throw new NotFoundException('Nie znaleziono zapisu.');
+    }
+
+    return {
+      enrollmentId: enrollment.id,
+      email: enrollment.email,
+      status: enrollment.status,
+      paymentStatus: enrollment.payment?.status ?? null,
+      paid:
+        enrollment.status === 'PAID' ||
+        enrollment.payment?.status === 'SUCCESS',
+    };
   }
 }

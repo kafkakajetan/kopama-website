@@ -1,7 +1,8 @@
 'use client';
 
 import Link from 'next/link';
-import {useEffect, useMemo, useState} from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import Image from "next/image";
 
 type PriceRule = {
@@ -106,6 +107,14 @@ type RegisterP24PaymentResult = {
     amountGrosze: number;
     currency: string;
     sessionId: string;
+};
+
+type EnrollmentPaymentStatusResult = {
+    enrollmentId: string;
+    email: string;
+    status: 'DRAFT' | 'PAYMENT_PENDING' | 'CASH_PENDING' | 'PAID' | 'CANCELED';
+    paymentStatus: 'REGISTERED' | 'SUCCESS' | 'REJECTED' | 'CANCELED' | 'ERROR' | null;
+    paid: boolean;
 };
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
@@ -263,6 +272,7 @@ export default function ZapisPage() {
         tempPassword?: string;
     } | null>(null);
     const [courseLanguage, setCourseLanguage] = useState<CourseLanguage>('PL');
+    const searchParams = useSearchParams();
 
     const [offers, setOffers] = useState<OfferItem[]>([]);
     const courseOffers = useMemo(
@@ -357,6 +367,57 @@ export default function ZapisPage() {
 
         void load();
     }, []);
+
+    useEffect(() => {
+        if (!API_URL) return;
+        if (loading) return;
+
+        const returnedEnrollmentId = searchParams.get('enrollmentId');
+        if (!returnedEnrollmentId) return;
+
+        let cancelled = false;
+
+        const restorePaymentStep = async () => {
+            try {
+                const res = await fetch(
+                    `${API_URL}/payments/p24/enrollments/${encodeURIComponent(returnedEnrollmentId)}/status`,
+                    { cache: 'no-store' },
+                );
+
+                if (!res.ok) {
+                    return;
+                }
+
+                const data = (await res.json()) as EnrollmentPaymentStatusResult;
+
+                if (cancelled) return;
+
+                setEnrollmentId(data.enrollmentId);
+
+                if (data.paid) {
+                    setCashAccount(null);
+                    setMockPay({
+                        ok: true,
+                        enrollmentId: data.enrollmentId,
+                        email: data.email,
+                        userCreated: false,
+                    });
+                    setError('');
+                    setStep(5);
+                } else {
+                    setStep(4);
+                    setError('Płatność nie została jeszcze potwierdzona. Odczekaj chwilę i spróbuj ponownie.');
+                }
+            } catch {
+            }
+        };
+
+        void restorePaymentStep();
+
+        return () => {
+            cancelled = true;
+        };
+    }, [API_URL, loading, searchParams]);
 
     const selectedOffer = useMemo(
         () => courseOffers.find((o) => o.code === form.offerItemCode) ?? null,

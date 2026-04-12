@@ -1,4 +1,4 @@
-import { Body, Controller, HttpCode, Param, Post } from '@nestjs/common';
+import { Controller, Get, Body, HttpCode, Param, Post } from '@nestjs/common';
 import { PaymentsService } from './payments.service';
 
 @Controller('payments/p24')
@@ -8,6 +8,11 @@ export class PaymentsController {
   @Post('enrollments/:id/register')
   registerEnrollment(@Param('id') id: string) {
     return this.payments.registerEnrollmentPayment(id);
+  }
+
+  @Get('enrollments/:id/status')
+  getEnrollmentStatus(@Param('id') id: string) {
+    return this.payments.getEnrollmentPaymentStatus(id);
   }
 
   @Post('status')
