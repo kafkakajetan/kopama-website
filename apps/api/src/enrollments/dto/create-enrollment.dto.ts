@@ -47,8 +47,15 @@ export class CreateEnrollmentDto {
   @IsPesel()
   pesel!: string;
 
-  @Transform((p: TransformFnParams) => trimString(p))
-  @Matches(/^\d{20}$/)
+  @Transform((p: TransformFnParams) =>
+    typeof p.value === 'string'
+      ? p.value
+          .trim()
+          .toUpperCase()
+          .replace(/[^A-Z0-9]/g, '')
+      : '',
+  )
+  @Matches(/^[A-Z0-9]{20}$/)
   pkkNumber!: string;
 
   @Transform((p: TransformFnParams) => trimString(p))

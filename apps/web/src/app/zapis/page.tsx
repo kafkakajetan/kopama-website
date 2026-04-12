@@ -18,8 +18,6 @@ type CourseStartSlot = {
     courseCategoryId: string;
 };
 
-type GearboxType = 'MANUAL' | 'AUTOMATIC';
-
 type OfferItem = {
     id: string;
     code: string;
@@ -28,7 +26,6 @@ type OfferItem = {
     type: 'COURSE' | 'EXTRA_HOUR' | 'EXAM_CAR' | 'TRAINING_PACKAGE' | 'OTHER';
     unit: 'PACKAGE' | 'HOUR' | 'SERVICE';
     isActive: boolean;
-    gearboxType?: GearboxType | null;
     fullPriceZloty?: string | null;
     fullPriceElearningZloty?: string | null;
     firstInstallmentPriceZloty?: string | null;
@@ -189,6 +186,12 @@ function sanitizeEmail(value: string): string {
     return value.trim().toLowerCase().replace(/\s+/g, '');
 }
 
+function sanitizePkkNumber(value: string): string {
+    return value
+        .toUpperCase()
+        .replace(/[^A-Z0-9]/g, '')
+        .slice(0, 20);
+}
 
 function getOfferFamilyKey(offer: OfferItem): string {
     if (offer.code.includes('AFTER_B1')) return `${offer.language}_AFTER_B1`;
@@ -471,9 +474,6 @@ export default function ZapisPage() {
         return courseOffers;
     }, [courseOffers]);
 
-    const selectedGearbox: GearboxType =
-        selectedOffer?.gearboxType === 'AUTOMATIC' ? 'AUTOMATIC' : 'MANUAL';
-
     const selectedFullPrice = getResolvedFullPrice(selectedOffer, form.courseMode);
     const selectedFirstInstallmentPrice = getResolvedFirstInstallmentPrice(
         selectedOffer,
@@ -576,28 +576,6 @@ export default function ZapisPage() {
         }));
     };
 
-    const changeGearbox = (gearbox: GearboxType) => {
-        if (!selectedOffer) return;
-
-        const familyKey = getOfferFamilyKey(selectedOffer);
-
-        const matchingOffer =
-            courseOffers.find(
-                (offer) =>
-                    getOfferFamilyKey(offer) === familyKey &&
-                    (offer.gearboxType ?? 'MANUAL') === gearbox,
-            ) ?? null;
-
-        if (!matchingOffer?.courseCategory?.id) return;
-
-        setForm((prev) => ({
-            ...prev,
-            offerItemCode: matchingOffer.code,
-            courseCategoryId: matchingOffer.courseCategory!.id,
-            courseStartDate: '',
-        }));
-    };
-
     const loadStartSlots = async (offerItemCode: string) => {
         if (!API_URL || !offerItemCode) {
             setAvailableStartSlots([]);
@@ -628,7 +606,9 @@ export default function ZapisPage() {
             if (!form.firstName || !form.lastName) return 'Uzupełnij imię i nazwisko.';
             if (!/^\+48\d{9}$/.test(form.phone)) return 'Telefon musi mieć format +48 i 9 cyfr.';
             if (!/^\d{11}$/.test(form.pesel)) return 'PESEL musi mieć 11 cyfr.';
-            if (!/^\d{20}$/.test(form.pkkNumber)) return 'Numer PKK musi mieć 20 cyfr.';
+            if (!/^[A-Z0-9]{20}$/.test(form.pkkNumber)) {
+                return 'Numer PKK musi mieć 20 znaków i może zawierać litery oraz cyfry.';
+            }
             if (!/^\d{2}-\d{3}$/.test(form.postalCode)) return 'Kod pocztowy musi mieć format 00-000.';
             if (!isElearning && !form.courseStartDate) {
                 return 'Wybierz termin rozpoczęcia kursu.';
@@ -707,7 +687,7 @@ export default function ZapisPage() {
                 otherDrivingLicenseNumber: form.otherDrivingLicenseNumber.trim(),
                 tramPermitNumber: form.tramPermitNumber.trim(),
                 pesel: digitsOnly(form.pesel).slice(0, 11),
-                pkkNumber: digitsOnly(form.pkkNumber).slice(0, 20),
+                pkkNumber: sanitizePkkNumber(form.pkkNumber),
                 email: sanitizeEmail(form.email),
                 postalCode: formatPostalCode(form.postalCode),
             };
@@ -1009,18 +989,22 @@ export default function ZapisPage() {
                                             </div>
                                         </div>
 
-                                        <div className="wizGrid2" style={{marginTop: 12}}>
+                                        <div className="wizGrid2" style={{ marginTop: 12 }}>
                                             <div>
-                                                <label>Rodzaj skrzyni biegów</label>
-                                                <div className="kpSelectWrap">
-                                                    <select
-                                                        className="kpSelect"
-                                                        value={selectedGearbox}
-                                                        onChange={(e) => changeGearbox(e.target.value as GearboxType)}
-                                                    >
-                                                        <option value="MANUAL">Manual</option>
-                                                        <option value="AUTOMATIC">Automat</option>
-                                                    </select>
+                                                <label>Wybrany kurs</label>
+                                                <div
+                                                    style={{
+                                                        minHeight: 52,
+                                                        border: '1px solid rgba(0,0,0,.08)',
+                                                        borderRadius: 14,
+                                                        padding: '14px 16px',
+                                                        background: '#fff',
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        fontWeight: 700,
+                                                    }}
+                                                >
+                                                    {selectedOffer?.name ?? 'Brak wybranego kursu'}
                                                 </div>
                                             </div>
 
@@ -1098,10 +1082,9 @@ export default function ZapisPage() {
                                                 <label>Numer PKK</label>
                                                 <input
                                                     value={form.pkkNumber}
-                                                    onChange={(e) => set('pkkNumber', digitsOnly(e.target.value).slice(0, 20))}
-                                                    inputMode="numeric"
+                                                    onChange={(e) => set('pkkNumber', sanitizePkkNumber(e.target.value))}
                                                     maxLength={20}
-                                                    placeholder="20 cyfr"
+                                                    placeholder="numer PKK"
                                                 />
                                             </div>
                                         </div>
