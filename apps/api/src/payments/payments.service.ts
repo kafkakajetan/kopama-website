@@ -2,6 +2,7 @@ import {
   BadRequestException,
   Injectable,
   InternalServerErrorException,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -47,6 +48,8 @@ type P24StatusNotificationBody = {
 
 @Injectable()
 export class PaymentsService {
+  private readonly logger = new Logger(PaymentsService.name);
+
   constructor(
     private readonly config: ConfigService,
     private readonly prisma: PrismaService,
@@ -209,76 +212,74 @@ export class PaymentsService {
     };
   }
 
-  async handleStatusNotification(body: P24StatusNotificationBody) {
+  async handleStatusNotification(rawBody: Record<string, unknown>) {
+    const body = rawBody as P24StatusNotificationBody;
+
+    const merchantId =
+      typeof body.merchantId === 'number'
+        ? body.merchantId
+        : Number(body.merchantId);
+
+    const posId =
+      typeof body.posId === 'number' ? body.posId : Number(body.posId);
+
     const sessionId =
       typeof body.sessionId === 'string' ? body.sessionId.trim() : '';
+
+    const amount =
+      typeof body.amount === 'number' ? body.amount : Number(body.amount);
+
     const currency =
       typeof body.currency === 'string' ? body.currency.trim() : '';
-    const sign = typeof body.sign === 'string' ? body.sign.trim() : '';
-    const amount = Number(body.amount);
-    const orderId = Number(body.orderId);
 
-    if (!sessionId || !currency || !sign) {
-      throw new BadRequestException(
-        'Brak wymaganych danych w powiadomieniu P24.',
+    const orderId =
+      typeof body.orderId === 'number' ? body.orderId : Number(body.orderId);
+
+    if (
+      !merchantId ||
+      !posId ||
+      !sessionId ||
+      !amount ||
+      !currency ||
+      !orderId
+    ) {
+      this.logger.error(
+        `P24 status: brak wymaganych pól. body=${JSON.stringify(rawBody)}`,
       );
+      throw new BadRequestException('Nieprawidłowe dane notyfikacji P24.');
     }
 
-    if (Number.isNaN(amount) || Number.isNaN(orderId)) {
-      throw new BadRequestException(
-        'Nieprawidłowe dane kwoty lub orderId w powiadomieniu P24.',
+    const config = this.getConfig();
+
+    if (merchantId !== config.merchantId || posId !== config.posId) {
+      this.logger.error(
+        `P24 status: niezgodny merchantId/posId. expected merchantId=${config.merchantId}, posId=${config.posId}, got merchantId=${merchantId}, posId=${posId}`,
       );
+      throw new BadRequestException('Nieprawidłowy merchantId lub posId.');
     }
 
-    const payment = await this.prisma.paymentTransaction.findUnique({
+    const payment = await this.prisma.paymentTransaction.findFirst({
       where: { p24SessionId: sessionId },
-      include: {
-        enrollment: {
-          include: {
-            offerItem: {
-              include: {
-                priceRules: true,
-              },
-            },
-          },
-        },
-      },
+      include: { enrollment: true },
     });
 
     if (!payment) {
-      throw new BadRequestException(
-        'Nie znaleziono płatności dla podanego sessionId.',
+      this.logger.error(
+        `P24 status: nie znaleziono paymentTransaction dla sessionId=${sessionId}`,
       );
-    }
-
-    const expectedPayment = this.resolveEnrollmentPaymentData(
-      payment.enrollment,
-    );
-
-    if (amount !== expectedPayment.amountGrosze) {
-      throw new BadRequestException(
-        'Kwota z webhooka nie zgadza się z zapisem.',
-      );
-    }
-
-    const expectedSign = this.createVerifySign({
-      sessionId,
-      orderId,
-      amount,
-      currency,
-    });
-
-    if (expectedSign !== sign) {
-      throw new BadRequestException(
-        'Nieprawidłowy podpis powiadomienia Przelewy24.',
-      );
+      throw new NotFoundException('Nie znaleziono transakcji płatności.');
     }
 
     if (payment.status === 'SUCCESS' && payment.enrollment.status === 'PAID') {
+      this.logger.log(
+        `P24 status already handled: enrollmentId=${payment.enrollmentId}, sessionId=${sessionId}, orderId=${orderId}`,
+      );
       return { ok: true };
     }
 
-    const { merchantId, posId, baseUrl } = this.getConfig();
+    this.logger.log(
+      `P24 status received: enrollmentId=${payment.enrollmentId}, sessionId=${sessionId}, orderId=${orderId}, amount=${amount}, currency=${currency}`,
+    );
 
     const verifySign = this.createVerifySign({
       sessionId,
@@ -287,74 +288,106 @@ export class PaymentsService {
       currency,
     });
 
-    const verifyResponse = await fetch(`${baseUrl}/api/v1/transaction/verify`, {
-      method: 'PUT',
-      headers: {
-        Authorization: this.getAuthHeader(),
-        'Content-Type': 'application/json',
+    const verifyResponse = await fetch(
+      `${config.baseUrl}/api/v1/transaction/verify`,
+      {
+        method: 'PUT',
+        headers: {
+          Authorization: this.getAuthHeader(),
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          merchantId: config.merchantId,
+          posId: config.posId,
+          sessionId,
+          amount,
+          currency,
+          orderId,
+          sign: verifySign,
+        }),
       },
-      body: JSON.stringify({
-        merchantId,
-        posId,
-        sessionId,
-        amount,
-        currency,
-        orderId,
-        sign: verifySign,
-      }),
-    });
+    );
 
     const verifyBody = (await verifyResponse
       .json()
       .catch(() => null)) as P24VerifyResponse;
 
     if (!verifyResponse.ok) {
+      const message =
+        typeof verifyBody?.error === 'string'
+          ? verifyBody.error
+          : typeof verifyBody?.message === 'string'
+            ? verifyBody.message
+            : 'Nie udało się potwierdzić płatności w Przelewy24.';
+
+      this.logger.error(
+        `P24 verify failed: enrollmentId=${payment.enrollmentId}, sessionId=${sessionId}, response=${JSON.stringify(verifyBody)}`,
+      );
+
       await this.prisma.paymentTransaction.update({
         where: { id: payment.id },
         data: {
           status: 'ERROR',
           p24OrderId: String(orderId),
           lastWebhookAt: new Date(),
-          rawPayload: body as Prisma.InputJsonValue,
+          rawPayload: {
+            notification: rawBody,
+            verify: verifyBody,
+          } as Prisma.InputJsonValue,
         },
       });
-
-      const message =
-        typeof verifyBody?.error === 'string'
-          ? verifyBody.error
-          : typeof verifyBody?.message === 'string'
-            ? verifyBody.message
-            : 'Przelewy24 odrzuciło weryfikację płatności.';
 
       throw new BadRequestException(message);
     }
 
-    if (
-      typeof verifyBody?.data?.status === 'string' &&
-      verifyBody.data.status !== 'success'
-    ) {
-      throw new BadRequestException(
-        'Płatność nie została potwierdzona przez P24.',
-      );
-    }
+    await this.prisma.paymentTransaction.update({
+      where: { id: payment.id },
+      data: {
+        status: 'SUCCESS',
+        p24OrderId: String(orderId),
+        lastWebhookAt: new Date(),
+        rawPayload: {
+          notification: rawBody,
+          verify: verifyBody,
+        } as Prisma.InputJsonValue,
+      },
+    });
 
-    await this.prisma.$transaction([
-      this.prisma.paymentTransaction.update({
-        where: { id: payment.id },
-        data: {
-          status: 'SUCCESS',
-          p24OrderId: String(orderId),
-          lastWebhookAt: new Date(),
-          rawPayload: body as Prisma.InputJsonValue,
-        },
-      }),
-      this.prisma.enrollment.update({
-        where: { id: payment.enrollmentId },
-        data: { status: 'PAID' },
-      }),
-    ]);
+    await this.prisma.enrollment.update({
+      where: { id: payment.enrollmentId },
+      data: {
+        status: 'PAID',
+      },
+    });
+
+    this.logger.log(
+      `P24 verify success: enrollmentId=${payment.enrollmentId}, orderId=${orderId}`,
+    );
 
     return { ok: true };
+  }
+
+  async getEnrollmentPaymentStatus(enrollmentId: string) {
+    const enrollment = await this.prisma.enrollment.findUnique({
+      where: { id: enrollmentId },
+      include: {
+        payment: true,
+      },
+    });
+
+    if (!enrollment) {
+      throw new NotFoundException('Nie znaleziono zapisu.');
+    }
+
+    return {
+      enrollmentId: enrollment.id,
+      email: enrollment.email,
+      status: enrollment.status,
+      paymentStatus: enrollment.payment?.status ?? null,
+      paid:
+        enrollment.status === 'PAID' ||
+        enrollment.payment?.status === 'SUCCESS',
+    };
   }
 
   private resolveEnrollmentPaymentData(enrollment: {
@@ -483,28 +516,5 @@ export class PaymentsService {
     }
 
     return value.trim();
-  }
-
-  async getEnrollmentPaymentStatus(enrollmentId: string) {
-    const enrollment = await this.prisma.enrollment.findUnique({
-      where: { id: enrollmentId },
-      include: {
-        payment: true,
-      },
-    });
-
-    if (!enrollment) {
-      throw new NotFoundException('Nie znaleziono zapisu.');
-    }
-
-    return {
-      enrollmentId: enrollment.id,
-      email: enrollment.email,
-      status: enrollment.status,
-      paymentStatus: enrollment.payment?.status ?? null,
-      paid:
-        enrollment.status === 'PAID' ||
-        enrollment.payment?.status === 'SUCCESS',
-    };
   }
 }
