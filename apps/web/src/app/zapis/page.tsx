@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useMemo, useState } from 'react';
+import {useEffect, useMemo, useState} from 'react';
 import Image from "next/image";
 
 type PriceRule = {
@@ -18,6 +18,8 @@ type CourseStartSlot = {
     courseCategoryId: string;
 };
 
+type GearboxType = 'MANUAL' | 'AUTOMATIC';
+
 type OfferItem = {
     id: string;
     code: string;
@@ -26,6 +28,13 @@ type OfferItem = {
     type: 'COURSE' | 'EXTRA_HOUR' | 'EXAM_CAR' | 'TRAINING_PACKAGE' | 'OTHER';
     unit: 'PACKAGE' | 'HOUR' | 'SERVICE';
     isActive: boolean;
+    gearboxType?: GearboxType | null;
+    fullPriceZloty?: string | null;
+    fullPriceElearningZloty?: string | null;
+    firstInstallmentPriceZloty?: string | null;
+    firstInstallmentPriceElearningZloty?: string | null;
+    installmentsTotalPriceZloty?: string | null;
+    installmentsTotalPriceElearningZloty?: string | null;
     courseCategory?: CourseCategory | null;
     priceRules: PriceRule[];
 };
@@ -56,6 +65,7 @@ type CreateEnrollmentPayload = {
     tramPermitNumber: string;
 
     wantsCashPayment: boolean;
+    wantsInstallments: boolean;
 
     guardianSameAddress: boolean;
 
@@ -103,7 +113,7 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL;
 function formatPLN(priceZloty: string): string {
     const n = Number.parseFloat(priceZloty);
     if (Number.isNaN(n)) return `${priceZloty} PLN`;
-    return new Intl.NumberFormat('pl-PL', { style: 'currency', currency: 'PLN' }).format(n);
+    return new Intl.NumberFormat('pl-PL', {style: 'currency', currency: 'PLN'}).format(n);
 }
 
 function digitsOnly(value: string): string {
@@ -170,7 +180,44 @@ function sanitizeEmail(value: string): string {
     return value.trim().toLowerCase().replace(/\s+/g, '');
 }
 
-function Stepper({ current }: { current: 1 | 2 | 3 | 4 | 5}) {
+function getOfferFamilyKey(offer: OfferItem): string {
+    if (offer.code.includes('AFTER_B1')) return `${offer.language}_AFTER_B1`;
+    if (offer.code.includes('INDIVIDUAL')) return `${offer.language}_INDIVIDUAL`;
+    if (offer.code.includes('NO_THEORY')) return `${offer.language}_NO_THEORY`;
+    return `${offer.language}_B`;
+}
+
+function getResolvedFullPrice(offer: OfferItem | null, courseMode: 'STATIONARY' | 'ELEARNING'): string | null {
+    if (!offer) return null;
+
+    if (courseMode === 'ELEARNING') {
+        return offer.fullPriceElearningZloty ?? offer.fullPriceZloty ?? getPublicPrice(offer);
+    }
+
+    return offer.fullPriceZloty ?? getPublicPrice(offer);
+}
+
+function getResolvedFirstInstallmentPrice(offer: OfferItem | null, courseMode: 'STATIONARY' | 'ELEARNING'): string | null {
+    if (!offer) return null;
+
+    if (courseMode === 'ELEARNING') {
+        return offer.firstInstallmentPriceElearningZloty ?? offer.firstInstallmentPriceZloty ?? null;
+    }
+
+    return offer.firstInstallmentPriceZloty ?? null;
+}
+
+function getResolvedInstallmentsTotalPrice(offer: OfferItem | null, courseMode: 'STATIONARY' | 'ELEARNING'): string | null {
+    if (!offer) return null;
+
+    if (courseMode === 'ELEARNING') {
+        return offer.installmentsTotalPriceElearningZloty ?? offer.installmentsTotalPriceZloty ?? null;
+    }
+
+    return offer.installmentsTotalPriceZloty ?? null;
+}
+
+function Stepper({current}: { current: 1 | 2 | 3 | 4 | 5 }) {
     const steps: Array<1 | 2 | 3 | 4 | 5> = [1, 2, 3, 4, 5];
     return (
         <ol className="kpProgress" aria-label="Postęp">
@@ -237,6 +284,7 @@ export default function ZapisPage() {
         tramPermitNumber: '',
 
         wantsCashPayment: false,
+        wantsInstallments: false,
 
         guardianSameAddress: false,
         guardianPesel: '',
@@ -264,7 +312,7 @@ export default function ZapisPage() {
                 setError('');
                 if (!API_URL) throw new Error('Brak NEXT_PUBLIC_API_URL w apps/web/.env.local')
 
-                const res = await fetch(`${API_URL}/offers`, { cache: 'no-store' });
+                const res = await fetch(`${API_URL}/offers`, {cache: 'no-store'});
                 if (!res.ok) throw new Error(`Nie udało się pobrać oferty (HTTP ${res.status})`);
 
                 const data = (await res.json()) as OfferItem[];
@@ -294,6 +342,32 @@ export default function ZapisPage() {
     const selectedOffer = useMemo(
         () => courseOffers.find((o) => o.code === form.offerItemCode) ?? null,
         [courseOffers, form.offerItemCode],
+    );
+
+    const displayCourseOffers = useMemo(() => {
+        const map = new Map<string, OfferItem>();
+
+        for (const offer of courseOffers) {
+            const key = getOfferFamilyKey(offer);
+            if (!map.has(key)) {
+                map.set(key, offer);
+            }
+        }
+
+        return Array.from(map.values());
+    }, [courseOffers]);
+
+    const selectedGearbox: GearboxType =
+        selectedOffer?.gearboxType === 'AUTOMATIC' ? 'AUTOMATIC' : 'MANUAL';
+
+    const selectedFullPrice = getResolvedFullPrice(selectedOffer, form.courseMode);
+    const selectedFirstInstallmentPrice = getResolvedFirstInstallmentPrice(
+        selectedOffer,
+        form.courseMode,
+    );
+    const selectedInstallmentsTotalPrice = getResolvedInstallmentsTotalPrice(
+        selectedOffer,
+        form.courseMode,
     );
 
     const isElearning = form.courseMode === 'ELEARNING';
@@ -369,7 +443,7 @@ export default function ZapisPage() {
     }, [isElearning, form.courseStartDate]);
 
     const set = <K extends keyof CreateEnrollmentPayload>(key: K, value: CreateEnrollmentPayload[K]) => {
-        setForm((p) => ({ ...p, [key]: value }));
+        setForm((p) => ({...p, [key]: value}));
     };
 
     const pickOffer = (offer: OfferItem) => {
@@ -388,6 +462,28 @@ export default function ZapisPage() {
         }));
     };
 
+    const changeGearbox = (gearbox: GearboxType) => {
+        if (!selectedOffer) return;
+
+        const familyKey = getOfferFamilyKey(selectedOffer);
+
+        const matchingOffer =
+            courseOffers.find(
+                (offer) =>
+                    getOfferFamilyKey(offer) === familyKey &&
+                    (offer.gearboxType ?? 'MANUAL') === gearbox,
+            ) ?? null;
+
+        if (!matchingOffer?.courseCategory?.id) return;
+
+        setForm((prev) => ({
+            ...prev,
+            offerItemCode: matchingOffer.code,
+            courseCategoryId: matchingOffer.courseCategory!.id,
+            courseStartDate: '',
+        }));
+    };
+
     const loadStartSlots = async (offerItemCode: string) => {
         if (!API_URL || !offerItemCode) {
             setAvailableStartSlots([]);
@@ -396,7 +492,7 @@ export default function ZapisPage() {
 
         const res = await fetch(
             `${API_URL}/course-start-slots/public?offerItemCode=${encodeURIComponent(offerItemCode)}`,
-            { cache: 'no-store' },
+            {cache: 'no-store'},
         );
 
         if (!res.ok) {
@@ -445,6 +541,16 @@ export default function ZapisPage() {
                 return 'Zaakceptuj regulamin i politykę prywatności.';
             }
 
+            if (form.wantsCashPayment && form.wantsInstallments) {
+                return 'Wybierz tylko jeden wariant dodatkowy: gotówka albo raty.';
+            }
+
+            if (form.wantsInstallments) {
+                if (!selectedFirstInstallmentPrice || !selectedInstallmentsTotalPrice) {
+                    return 'Wybrany kurs nie ma skonfigurowanych płatności ratalnych.';
+                }
+            }
+
             return null;
         }
 
@@ -478,6 +584,7 @@ export default function ZapisPage() {
 
             const payload: Record<string, unknown> = {
                 ...form,
+                wantsInstallments: form.wantsInstallments,
                 hasOtherDrivingLicense: isBAfterB1 || form.hasOtherDrivingLicense,
                 otherDrivingLicenseCategory: isBAfterB1
                     ? 'B1'
@@ -520,7 +627,7 @@ export default function ZapisPage() {
 
             const res = await fetch(`${API_URL}/enrollments`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify(payload),
             });
 
@@ -637,7 +744,7 @@ export default function ZapisPage() {
                             </div>
                         ) : (
                             <div className="wizPanel">
-                                <Stepper current={step} />
+                                <Stepper current={step}/>
 
                                 <div className="wizHeader">
                                     <h2 className="wizTitle">
@@ -650,15 +757,16 @@ export default function ZapisPage() {
                                     <p className="wizMeta">Krok {step} z 5</p>
                                 </div>
 
-                                {error && <p style={{ color: 'crimson', whiteSpace: 'pre-wrap', marginTop: 0 }}>{error}</p>}
+                                {error &&
+                                    <p style={{color: 'crimson', whiteSpace: 'pre-wrap', marginTop: 0}}>{error}</p>}
 
                                 {step === 1 && (
                                     <>
-                                        <h2 className="wizMeta" style={{ marginTop: 0 }}>
+                                        <h2 className="wizMeta" style={{marginTop: 0}}>
                                             Wybierz wariant kursu. Cena dotyczy płatności online.
                                         </h2>
 
-                                        <div style={{ display: 'flex', gap: 12, margin: '12px 0 20px' }}>
+                                        <div style={{display: 'flex', gap: 12, margin: '12px 0 20px'}}>
                                             <button
                                                 type="button"
                                                 className={`pill ${courseLanguage === 'PL' ? 'navy' : 'beige'}`}
@@ -677,8 +785,8 @@ export default function ZapisPage() {
                                         </div>
 
                                         <div className="offerGrid">
-                                            {courseOffers.map((o) => {
-                                                const price = getPublicPrice(o);
+                                            {displayCourseOffers.map((o) => {
+                                                const price = getResolvedFullPrice(o, form.courseMode);
                                                 const selected = o.code === form.offerItemCode;
                                                 return (
                                                     <button
@@ -689,6 +797,8 @@ export default function ZapisPage() {
                                                         aria-pressed={selected}
                                                     >
                                                         <p className="offerName">{o.name}</p>
+                                                        <p className="offerHint">Tryb kursu, skrzynię i sposób płatności
+                                                            wybierzesz w kroku 2</p>
                                                         <p className="offerPrice">{price ? formatPLN(price) : 'Brak ceny'}</p>
                                                         <p className="offerHint">Kliknij, aby wybrać</p>
                                                     </button>
@@ -697,7 +807,7 @@ export default function ZapisPage() {
                                         </div>
 
                                         <div className="wizActions">
-                                            <div />
+                                            <div/>
                                             <div className="wizActionsRight">
                                                 <button type="button" className="pill navy" onClick={next}>
                                                     Dalej
@@ -712,11 +822,13 @@ export default function ZapisPage() {
                                         <div className="wizGrid2">
                                             <div>
                                                 <label>Imię</label>
-                                                <input value={form.firstName} onChange={(e) => set('firstName', e.target.value)} />
+                                                <input value={form.firstName}
+                                                       onChange={(e) => set('firstName', e.target.value)}/>
                                             </div>
                                             <div>
                                                 <label>Nazwisko</label>
-                                                <input value={form.lastName} onChange={(e) => set('lastName', e.target.value)} />
+                                                <input value={form.lastName}
+                                                       onChange={(e) => set('lastName', e.target.value)}/>
                                             </div>
                                         </div>
 
@@ -770,6 +882,40 @@ export default function ZapisPage() {
                                             </div>
                                         </div>
 
+                                        <div className="wizGrid2" style={{marginTop: 12}}>
+                                            <div>
+                                                <label>Rodzaj skrzyni biegów</label>
+                                                <div className="kpSelectWrap">
+                                                    <select
+                                                        className="kpSelect"
+                                                        value={selectedGearbox}
+                                                        onChange={(e) => changeGearbox(e.target.value as GearboxType)}
+                                                    >
+                                                        <option value="MANUAL">Manual</option>
+                                                        <option value="AUTOMATIC">Automat</option>
+                                                    </select>
+                                                </div>
+                                            </div>
+
+                                            <div>
+                                                <label>Aktualna cena kursu</label>
+                                                <div
+                                                    style={{
+                                                        minHeight: 52,
+                                                        border: '1px solid rgba(0,0,0,.08)',
+                                                        borderRadius: 14,
+                                                        padding: '14px 16px',
+                                                        background: '#fff',
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        fontWeight: 700,
+                                                    }}
+                                                >
+                                                    {selectedFullPrice ? formatPLN(selectedFullPrice) : 'Brak ceny'}
+                                                </div>
+                                            </div>
+                                        </div>
+
                                         <div>
                                             <label>Termin rozpoczęcia kursu</label>
                                             <div className="kpSelectWrap">
@@ -800,7 +946,8 @@ export default function ZapisPage() {
 
                                             {isElearning ? (
                                                 <p className="kpSelectHint">
-                                                    Dla kursu e-learning termin rozpoczęcia nie jest wymagany na tym etapie.
+                                                    Dla kursu e-learning termin rozpoczęcia nie jest wymagany na tym
+                                                    etapie.
                                                 </p>
                                             ) : filteredStartSlots.length === 0 ? (
                                                 <p className="kpSelectHint">
@@ -835,12 +982,14 @@ export default function ZapisPage() {
 
                                         <div>
                                             <label>Adres (ulica i numer)</label>
-                                            <input value={form.addressLine1} onChange={(e) => set('addressLine1', e.target.value)} />
+                                            <input value={form.addressLine1}
+                                                   onChange={(e) => set('addressLine1', e.target.value)}/>
                                         </div>
 
                                         <div>
                                             <label>Adres cd. (opcjonalnie)</label>
-                                            <input value={form.addressLine2 ?? ''} onChange={(e) => set('addressLine2', e.target.value)} />
+                                            <input value={form.addressLine2 ?? ''}
+                                                   onChange={(e) => set('addressLine2', e.target.value)}/>
                                         </div>
 
                                         <div>
@@ -861,7 +1010,7 @@ export default function ZapisPage() {
                                                 marginTop: 16,
                                             }}
                                         >
-                                            <label className="check" style={{ margin: 0 }}>
+                                            <label className="check" style={{margin: 0}}>
                                                 <input
                                                     type="checkbox"
                                                     checked={isBAfterB1 || form.hasOtherDrivingLicense}
@@ -879,11 +1028,11 @@ export default function ZapisPage() {
                                                     ? 'Posiadam już prawo jazdy kategorii B1'
                                                     : 'Posiadam już prawo jazdy innej kategorii'}
                                                 {!isBAfterB1 && (
-                                                    <span style={{ marginLeft: 6, color: '#8a8a8a' }}>(opcjonalnie)</span>
+                                                    <span style={{marginLeft: 6, color: '#8a8a8a'}}>(opcjonalnie)</span>
                                                 )}
                                             </label>
 
-                                            <label className="check" style={{ margin: 0 }}>
+                                            <label className="check" style={{margin: 0}}>
                                                 <input
                                                     type="checkbox"
                                                     checked={form.hasTramPermit}
@@ -897,13 +1046,13 @@ export default function ZapisPage() {
                                                 />
                                                 Posiadam uprawnienia do kierowania tramwajem
                                                 {!isBAfterB1 && (
-                                                    <span style={{ marginLeft: 6, color: '#8a8a8a' }}>(opcjonalnie)</span>
+                                                    <span style={{marginLeft: 6, color: '#8a8a8a'}}>(opcjonalnie)</span>
                                                 )}
                                             </label>
                                         </div>
 
                                         {shouldShowOtherDrivingLicenseFields && (
-                                            <div className="wizGrid2" style={{ marginTop: 10 }}>
+                                            <div className="wizGrid2" style={{marginTop: 10}}>
                                                 <div>
                                                     <label>Kategoria posiadanego prawa jazdy</label>
                                                     <input
@@ -925,7 +1074,7 @@ export default function ZapisPage() {
                                         )}
 
                                         {form.hasTramPermit && (
-                                            <div style={{ marginTop: 10 }}>
+                                            <div style={{marginTop: 10}}>
                                                 <label>Numer uprawnień do kierowania tramwajem</label>
                                                 <input
                                                     value={form.tramPermitNumber}
@@ -981,8 +1130,8 @@ export default function ZapisPage() {
                                         </div>
 
                                         {minor && (
-                                            <div style={{ marginTop: 12 }}>
-                                                <p className="wizMeta" style={{ marginTop: 0 }}>
+                                            <div style={{marginTop: 12}}>
+                                                <p className="wizMeta" style={{marginTop: 0}}>
                                                     Uwaga: osoba niepełnoletnia. Umowa wymaga podpisu opiekuna prawnego.
                                                 </p>
 
@@ -1011,15 +1160,17 @@ export default function ZapisPage() {
                                                 <div className="wizGrid2">
                                                     <div>
                                                         <label>Imię opiekuna</label>
-                                                        <input value={form.guardianFirstName} onChange={(e) => set('guardianFirstName', e.target.value)} />
+                                                        <input value={form.guardianFirstName}
+                                                               onChange={(e) => set('guardianFirstName', e.target.value)}/>
                                                     </div>
                                                     <div>
                                                         <label>Nazwisko opiekuna</label>
-                                                        <input value={form.guardianLastName} onChange={(e) => set('guardianLastName', e.target.value)} />
+                                                        <input value={form.guardianLastName}
+                                                               onChange={(e) => set('guardianLastName', e.target.value)}/>
                                                     </div>
                                                 </div>
 
-                                                <label className="check" style={{ margin: '10px 0 0' }}>
+                                                <label className="check" style={{margin: '10px 0 0'}}>
                                                     <input
                                                         type="checkbox"
                                                         checked={form.guardianSameAddress}
@@ -1037,7 +1188,7 @@ export default function ZapisPage() {
                                                     Dane adresowe opiekuna takie same jak kursanta
                                                 </label>
 
-                                                <div className="wizGrid2" style={{ marginTop: 10 }}>
+                                                <div className="wizGrid2" style={{marginTop: 10}}>
                                                     <div>
                                                         <label>Adres opiekuna (ulica i numer)</label>
                                                         <input
@@ -1080,15 +1231,83 @@ export default function ZapisPage() {
                                             </div>
                                         )}
 
-                                        <div style={{ marginTop: 16 }}>
-                                            <label className="check" style={{ margin: 0 }}>
-                                                <input
-                                                    type="checkbox"
-                                                    checked={form.wantsCashPayment}
-                                                    onChange={(e) => set('wantsCashPayment', e.target.checked)}
-                                                />
-                                                Chciałbym uiścić płatność gotówką
-                                            </label>
+                                        <div
+                                            style={{
+                                                marginTop: 16,
+                                                display: 'grid',
+                                                gap: 12,
+                                            }}
+                                        >
+                                            <div
+                                                style={{
+                                                    border: '1px solid rgba(0,0,0,.08)',
+                                                    borderRadius: 14,
+                                                    padding: '14px 16px',
+                                                    background: '#fff',
+                                                }}
+                                            >
+                                                <div style={{fontWeight: 700, marginBottom: 10}}>Sposób płatności</div>
+
+                                                <label className="check" style={{margin: 0}}>
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={!form.wantsCashPayment && !form.wantsInstallments}
+                                                        onChange={() => {
+                                                            set('wantsCashPayment', false);
+                                                            set('wantsInstallments', false);
+                                                        }}
+                                                    />
+                                                        Płacę całość online
+                                                        {selectedFullPrice ? (
+                                                            <span style={{marginLeft: 8, color: '#666'}}>
+                                                                ({formatPLN(selectedFullPrice)})
+                                                            </span>
+                                                        ) : null}
+                                                </label>
+
+                                                <label className="check" style={{margin: '10px 0 0'}}>
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={form.wantsInstallments}
+                                                        onChange={(e) => {
+                                                            const checked = e.target.checked;
+                                                            set('wantsInstallments', checked);
+                                                            if (checked) {
+                                                                set('wantsCashPayment', false);
+                                                            }
+                                                        }}
+                                                    />
+                                                        Chciałbym uiścić opłatę w ratach
+                                                        {selectedFirstInstallmentPrice ? (
+                                                            <span style={{marginLeft: 8, color: '#666'}}>
+                                                                (pierwsza rata: {formatPLN(selectedFirstInstallmentPrice)})
+                                                            </span>
+                                                        ) : null}
+                                                </label>
+
+                                                {form.wantsInstallments && selectedInstallmentsTotalPrice ? (
+                                                    <p className="kpSelectHint" style={{marginTop: 10}}>
+                                                        Całość przy płatności
+                                                        ratalnej: {formatPLN(selectedInstallmentsTotalPrice)}.
+                                                        Teraz opłacisz tylko pierwszą ratę online.
+                                                    </p>
+                                                ) : null}
+
+                                                <label className="check" style={{margin: '10px 0 0'}}>
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={form.wantsCashPayment}
+                                                        onChange={(e) => {
+                                                            const checked = e.target.checked;
+                                                            set('wantsCashPayment', checked);
+                                                            if (checked) {
+                                                                set('wantsInstallments', false);
+                                                            }
+                                                        }}
+                                                    />
+                                                    Chciałbym uiścić płatność gotówką
+                                                </label>
+                                            </div>
                                         </div>
 
                                         <div className="wizActions">
@@ -1106,27 +1325,49 @@ export default function ZapisPage() {
 
                                 {step === 3 && (
                                     <>
-                                        <p className="wizMeta" style={{ marginTop: 0 }}>
-                                            Sprawdź dane. Przed zakończeniem zapisu wymagamy akceptacji regulaminu sprzedaży.
+                                        <p className="wizMeta" style={{marginTop: 0}}>
+                                            Sprawdź dane. Przed zakończeniem zapisu wymagamy akceptacji regulaminu
+                                            sprzedaży.
                                         </p>
 
                                         <div className="wizGrid2">
                                             <div>
-                                                <p className="wizMeta"><strong>Kurs:</strong> {selectedOffer?.name ?? form.offerItemCode}</p>
+                                                <p className="wizMeta">
+                                                    <strong>Kurs:</strong> {selectedOffer?.name ?? form.offerItemCode}
+                                                </p>
                                                 <p className="wizMeta"><strong>Email:</strong> {form.email}</p>
-                                                <p className="wizMeta"><strong>Termin:</strong> {form.courseStartDate ? formatCourseStartDateLabel(form.courseStartDate) : '-'}</p>
+                                                <p className="wizMeta">
+                                                    <strong>Termin:</strong> {form.courseStartDate ? formatCourseStartDateLabel(form.courseStartDate) : '-'}
+                                                </p>
                                             </div>
                                             <div>
-                                                <p className="wizMeta"><strong>Imię i nazwisko:</strong> {form.firstName} {form.lastName}</p>
+                                                <p className="wizMeta"><strong>Imię i
+                                                    nazwisko:</strong> {form.firstName} {form.lastName}</p>
                                                 <p className="wizMeta"><strong>Telefon:</strong> {form.phone}</p>
                                                 <p className="wizMeta">
-                                                    <strong>Sposób płatności:</strong> {form.wantsCashPayment ? 'gotówka' : 'online'}
+                                                    <strong>Sposób płatności:</strong>{' '}
+                                                    {form.wantsCashPayment
+                                                        ? 'gotówka'
+                                                        : form.wantsInstallments
+                                                            ? `ratalnie – pierwsza rata online${
+                                                                selectedFirstInstallmentPrice
+                                                                    ? ` (${formatPLN(selectedFirstInstallmentPrice)})`
+                                                                    : ''
+                                                            }`
+                                                            : `online – całość${
+                                                                selectedFullPrice ? ` (${formatPLN(selectedFullPrice)})` : ''
+                                                            }`}
+                                                    {form.wantsInstallments && selectedInstallmentsTotalPrice ? (
+                                                        <p className="wizMeta">
+                                                            <strong>Całość przy ratach:</strong> {formatPLN(selectedInstallmentsTotalPrice)}
+                                                        </p>
+                                                    ) : null}
                                                 </p>
                                             </div>
                                         </div>
 
                                         {form.hasOtherDrivingLicense && (
-                                            <div style={{ marginTop: 10 }}>
+                                            <div style={{marginTop: 10}}>
                                                 <p className="wizMeta">
                                                     <strong>Prawo jazdy innej kategorii:</strong> tak
                                                 </p>
@@ -1140,7 +1381,7 @@ export default function ZapisPage() {
                                         )}
 
                                         {form.hasTramPermit && (
-                                            <div style={{ marginTop: 10 }}>
+                                            <div style={{marginTop: 10}}>
                                                 <p className="wizMeta">
                                                     <strong>Uprawnienia do kierowania tramwajem:</strong> tak
                                                 </p>
@@ -1150,8 +1391,8 @@ export default function ZapisPage() {
                                             </div>
                                         )}
 
-                                        <div style={{ marginTop: 10 }}>
-                                            <label className="check" style={{ margin: 0 }}>
+                                        <div style={{marginTop: 10}}>
+                                            <label className="check" style={{margin: 0}}>
                                                 <input
                                                     type="checkbox"
                                                     checked={form.acceptedSalesTerms}
@@ -1167,7 +1408,11 @@ export default function ZapisPage() {
                                             </button>
                                             <div className="wizActionsRight">
                                                 <button type="button" className="pill navy" onClick={submit}>
-                                                    {form.wantsCashPayment ? 'Zakończ zapis' : 'Przejdź do płatności'}
+                                                    {form.wantsCashPayment
+                                                        ? 'Zakończ zapis'
+                                                        : form.wantsInstallments
+                                                            ? 'Przejdź do opłacenia pierwszej raty'
+                                                            : 'Przejdź do płatności'}
                                                 </button>
                                             </div>
                                         </div>
@@ -1176,8 +1421,9 @@ export default function ZapisPage() {
 
                                 {step === 4 && (
                                     <>
-                                        <p className="wizMeta" style={{ marginTop: 0 }}>
-                                            Zapis został utworzony. W kolejnym kroku przekierujemy Cię do płatności Przelewy24.
+                                        <p className="wizMeta" style={{marginTop: 0}}>
+                                            Zapis został utworzony. W kolejnym kroku przekierujemy Cię do płatności
+                                            Przelewy24.
                                         </p>
                                         {enrollmentId && (
                                             <p className="wizMeta">
@@ -1202,17 +1448,20 @@ export default function ZapisPage() {
                                     <>
                                         {form.wantsCashPayment ? (
                                             <>
-                                                <p className="wizMeta" style={{ marginTop: 0 }}>
-                                                    Zapis został zakończony. Wybrano płatność gotówką, więc etap płatności online został pominięty.
+                                                <p className="wizMeta" style={{marginTop: 0}}>
+                                                    Zapis został zakończony. Wybrano płatność gotówką, więc etap
+                                                    płatności online został pominięty.
                                                 </p>
 
                                                 {cashAccount?.userCreated && cashAccount.tempPassword ? (
                                                     <p className="wizMeta">
-                                                        Dane do logowania: <strong>{cashAccount.email}</strong> / <strong>{cashAccount.tempPassword}</strong>
+                                                        Dane do
+                                                        logowania: <strong>{cashAccount.email}</strong> / <strong>{cashAccount.tempPassword}</strong>
                                                     </p>
                                                 ) : (
                                                     <p className="wizMeta">
-                                                        Konto kursanta jest powiązane z emailem: <strong>{cashAccount?.email ?? form.email}</strong>
+                                                        Konto kursanta jest powiązane z
+                                                        emailem: <strong>{cashAccount?.email ?? form.email}</strong>
                                                     </p>
                                                 )}
 
@@ -1222,13 +1471,15 @@ export default function ZapisPage() {
                                             </>
                                         ) : (
                                             <>
-                                                <p className="wizMeta" style={{ marginTop: 0 }}>
-                                                    Płatność została potwierdzona. Możesz teraz zalogować się do panelu kursanta lub wrócić na stronę główną.
+                                                <p className="wizMeta" style={{marginTop: 0}}>
+                                                    Płatność została potwierdzona. Możesz teraz zalogować się do panelu
+                                                    kursanta lub wrócić na stronę główną.
                                                 </p>
 
                                                 {mockPay?.userCreated && mockPay.tempPassword ? (
                                                     <p className="wizMeta">
-                                                        Dane testowe do logowania: <strong>{mockPay.email}</strong> / <strong>{mockPay.tempPassword}</strong>
+                                                        Dane testowe do
+                                                        logowania: <strong>{mockPay.email}</strong> / <strong>{mockPay.tempPassword}</strong>
                                                     </p>
                                                 ) : (
                                                     <p className="wizMeta">

@@ -134,6 +134,9 @@ export class CreateEnrollmentDto {
   @IsBoolean()
   wantsCashPayment!: boolean;
 
+  @IsBoolean()
+  wantsInstallments!: boolean;
+
   @IsOptional()
   @IsBoolean()
   guardianSameAddress?: boolean;

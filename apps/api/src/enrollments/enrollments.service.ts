@@ -52,9 +52,16 @@ export class EnrollmentsService {
         'Wymagana akceptacja regulaminu i polityki prywatności.',
       );
     }
+
     if (!dto.acceptedSalesTerms) {
       throw new BadRequestException(
         'Wymagana akceptacja regulaminu sprzedaży.',
+      );
+    }
+
+    if (dto.wantsCashPayment && dto.wantsInstallments) {
+      throw new BadRequestException(
+        'Nie można jednocześnie wybrać płatności gotówką i w ratach.',
       );
     }
 
@@ -131,12 +138,10 @@ export class EnrollmentsService {
       }
     }
 
-    if (dto.hasTramPermit) {
-      if (!dto.tramPermitNumber) {
-        throw new BadRequestException(
-          'Jeśli kursant posiada uprawnienia do kierowania tramwajem, wymagany jest numer uprawnień.',
-        );
-      }
+    if (dto.hasTramPermit && !dto.tramPermitNumber) {
+      throw new BadRequestException(
+        'Jeśli kursant posiada uprawnienia do kierowania tramwajem, wymagany jest numer uprawnień.',
+      );
     }
 
     const offer = await this.prisma.offerItem.findUnique({
@@ -147,9 +152,11 @@ export class EnrollmentsService {
     if (!offer || !offer.isActive || offer.type !== 'COURSE') {
       throw new BadRequestException('Nieprawidłowy kurs.');
     }
+
     if (!offer.courseCategoryId) {
       throw new BadRequestException('Kurs nie ma przypisanej kategorii.');
     }
+
     if (
       dto.courseCategoryId &&
       dto.courseCategoryId !== offer.courseCategoryId
@@ -200,6 +207,24 @@ export class EnrollmentsService {
       }
     }
 
+    if (dto.wantsInstallments) {
+      const firstInstallmentPrice = isElearning
+        ? (offer.firstInstallmentPriceElearningZloty ??
+          offer.firstInstallmentPriceZloty)
+        : offer.firstInstallmentPriceZloty;
+
+      const installmentsTotalPrice = isElearning
+        ? (offer.installmentsTotalPriceElearningZloty ??
+          offer.installmentsTotalPriceZloty)
+        : offer.installmentsTotalPriceZloty;
+
+      if (!firstInstallmentPrice || !installmentsTotalPrice) {
+        throw new BadRequestException(
+          'Wybrany kurs nie ma skonfigurowanych płatności ratalnych.',
+        );
+      }
+    }
+
     const guardianSameAddress = dto.guardianSameAddress === true;
 
     let createdEnrollment = await this.prisma.enrollment.create({
@@ -241,6 +266,7 @@ export class EnrollmentsService {
           : null,
 
         wantsCashPayment: dto.wantsCashPayment,
+        wantsInstallments: dto.wantsInstallments,
 
         isMinorAtPurchase: isMinor,
 
