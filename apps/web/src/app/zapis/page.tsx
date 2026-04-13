@@ -1244,9 +1244,9 @@ export default function ZapisPage() {
                                                     >
                                                         postanowienia regulaminu strony
                                                     </a>
-                                                    i
+                                                     i
                                                     <a
-                                                        href="https://kopama.pl/polityka-prywatnosci"
+                                                        href="https://kopama.pl/polityka-prywatności"
                                                         target="_blank"
                                                         rel="noreferrer"
                                                         onClick={(e) => e.stopPropagation()}
