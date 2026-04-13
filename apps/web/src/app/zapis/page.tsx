@@ -560,6 +560,13 @@ export default function ZapisPage() {
         setForm((p) => ({...p, [key]: value}));
     };
 
+    const acceptedSitePolicies = form.acceptedTerms && form.acceptedPrivacy;
+
+    const setAcceptedSitePolicies = (checked: boolean) => {
+        set('acceptedTerms', checked);
+        set('acceptedPrivacy', checked);
+    };
+
     const pickOffer = (offer: OfferItem) => {
         const catId = offer.courseCategory?.id;
         if (!catId) {
@@ -632,8 +639,8 @@ export default function ZapisPage() {
                 }
             }
 
-            if (!form.acceptedTerms || !form.acceptedPrivacy) {
-                return 'Zaakceptuj regulamin i politykę prywatności.';
+            if (!acceptedSitePolicies) {
+                return 'Zaakceptuj postanowienia regulaminu strony i polityki prywatności.';
             }
 
             if (form.wantsCashPayment && form.wantsInstallments) {
@@ -1205,49 +1212,50 @@ export default function ZapisPage() {
                                             </div>
                                         )}
 
-                                        <div
-                                            style={{
-                                                marginTop: 14,
-                                                display: 'grid',
-                                                gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
-                                                gap: 12,
-                                            }}
-                                        >
-                                            <label
+                                        <div style={{ marginTop: 14 }}>
+                                            <div
                                                 className="check"
                                                 style={{
                                                     margin: 0,
-                                                    border: '1px solid #d32f2f',
-                                                    borderRadius: 12,
-                                                    padding: '12px 14px',
-                                                    background: '#fff5f5',
+                                                    display: 'flex',
+                                                    alignItems: 'flex-start',
+                                                    gap: 10,
                                                 }}
                                             >
                                                 <input
+                                                    id="acceptedSitePolicies"
                                                     type="checkbox"
-                                                    checked={form.acceptedTerms}
-                                                    onChange={(e) => set('acceptedTerms', e.target.checked)}
+                                                    checked={acceptedSitePolicies}
+                                                    onChange={(e) => setAcceptedSitePolicies(e.target.checked)}
                                                 />
-                                                Akceptuję regulamin
-                                            </label>
 
-                                            <label
-                                                className="check"
-                                                style={{
-                                                    margin: 0,
-                                                    border: '1px solid #d32f2f',
-                                                    borderRadius: 12,
-                                                    padding: '12px 14px',
-                                                    background: '#fff5f5',
-                                                }}
-                                            >
-                                                <input
-                                                    type="checkbox"
-                                                    checked={form.acceptedPrivacy}
-                                                    onChange={(e) => set('acceptedPrivacy', e.target.checked)}
-                                                />
-                                                Akceptuję politykę prywatności
-                                            </label>
+                                                <label htmlFor="acceptedSitePolicies" style={{ margin: 0, cursor: 'pointer' }}>
+                                                    Akceptuję{' '}
+                                                    <a
+                                                        href="https://kopama.pl/polityka-prywatnosci"
+                                                        target="_blank"
+                                                        rel="noreferrer"
+                                                        onClick={(e) => e.stopPropagation()}
+                                                        style={{
+                                                            color: '#0b3bb3',
+                                                            textDecoration: 'underline',
+                                                            fontWeight: 600,
+                                                        }}
+                                                    >
+                                                        postanowienia regulaminu strony i polityki prywatności
+                                                    </a>
+                                                    <span
+                                                        aria-hidden="true"
+                                                        style={{
+                                                            color: '#d32f2f',
+                                                            marginLeft: 6,
+                                                            fontWeight: 700,
+                                                        }}
+                                                    >
+                                                        *
+                                                    </span>
+                                                </label>
+                                            </div>
                                         </div>
 
                                         {minor && (
@@ -1513,15 +1521,50 @@ export default function ZapisPage() {
                                             </div>
                                         )}
 
-                                        <div style={{marginTop: 10}}>
-                                            <label className="check" style={{margin: 0}}>
+                                        <div style={{ marginTop: 10 }}>
+                                            <div
+                                                className="check"
+                                                style={{
+                                                    margin: 0,
+                                                    display: 'flex',
+                                                    alignItems: 'flex-start',
+                                                    gap: 10,
+                                                }}
+                                            >
                                                 <input
+                                                    id="acceptedSalesTerms"
                                                     type="checkbox"
                                                     checked={form.acceptedSalesTerms}
                                                     onChange={(e) => set('acceptedSalesTerms', e.target.checked)}
                                                 />
-                                                Potwierdzam zapoznanie się z regulaminem sprzedaży
-                                            </label>
+
+                                                <label htmlFor="acceptedSalesTerms" style={{ margin: 0, cursor: 'pointer' }}>
+                                                    Potwierdzam zapoznanie się z{' '}
+                                                    <a
+                                                        href="https://kopama.pl/regulamin-sprzedazy"
+                                                        target="_blank"
+                                                        rel="noreferrer"
+                                                        onClick={(e) => e.stopPropagation()}
+                                                        style={{
+                                                            color: '#0b3bb3',
+                                                            textDecoration: 'underline',
+                                                            fontWeight: 600,
+                                                        }}
+                                                    >
+                                                        regulaminem sprzedaży
+                                                    </a>
+                                                    <span
+                                                        aria-hidden="true"
+                                                        style={{
+                                                            color: '#d32f2f',
+                                                            marginLeft: 6,
+                                                            fontWeight: 700,
+                                                        }}
+                                                    >
+                                                        *
+                                                    </span>
+                                                </label>
+                                            </div>
                                         </div>
 
                                         <div className="wizActions">

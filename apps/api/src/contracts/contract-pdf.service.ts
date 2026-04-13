@@ -406,23 +406,23 @@ export class ContractPdfService {
       drivingCategory: {
         pageIndex: 0,
         x: 87,
-        y: 550,
+        y: 556,
         size: 10,
         maxWidth: 70,
       },
       drivingNumber: {
         pageIndex: 0,
-        x: 286,
-        y: 550,
+        x: 252,
+        y: 556,
         size: 10,
-        maxWidth: 185,
+        maxWidth: 170,
       },
       tramPermitNumber: {
         pageIndex: 0,
-        x: 286,
-        y: 550,
+        x: 252,
+        y: 556,
         size: 10,
-        maxWidth: 185,
+        maxWidth: 170,
       },
     };
   }
@@ -439,13 +439,13 @@ export class ContractPdfService {
       fullName: {
         pageIndex: 0,
         x: 304,
-        y: 667,
+        y: 662,
         size: 10,
         maxWidth: 250,
       },
       pesel: {
         pageIndex: 0,
-        x: 438,
+        x: 422,
         y: 639,
         size: 10,
         maxWidth: 180,
