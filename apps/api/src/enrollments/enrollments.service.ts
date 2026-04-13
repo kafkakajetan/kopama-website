@@ -411,6 +411,20 @@ export class EnrollmentsService {
       offerLanguage: enrollment.offerItem.language,
       courseMode: enrollment.courseMode,
       wantsInstallments: enrollment.wantsInstallments,
+      firstName: enrollment.firstName,
+      lastName: enrollment.lastName,
+      pesel: enrollment.pesel,
+      pkkNumber: enrollment.pkkNumber,
+      addressLine1: enrollment.addressLine1,
+      addressLine2: enrollment.addressLine2,
+      city: enrollment.city,
+      postalCode: enrollment.postalCode,
+      phone: enrollment.phone,
+      email: enrollment.email,
+      otherDrivingLicenseCategory: enrollment.otherDrivingLicenseCategory,
+      otherDrivingLicenseNumber: enrollment.otherDrivingLicenseNumber,
+      hasTramPermit: enrollment.hasTramPermit,
+      tramPermitNumber: enrollment.tramPermitNumber,
     });
 
     await this.prisma.contractDocument.upsert({

@@ -1,5 +1,6 @@
-import { Injectable } from '@nestjs/common';
-import { copyFile, mkdir } from 'fs/promises';
+import { Injectable, InternalServerErrorException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { mkdir, readFile, writeFile } from 'fs/promises';
 import * as path from 'path';
 import {
   CourseMode,
@@ -7,6 +8,8 @@ import {
   type Enrollment,
   type OfferItem,
 } from '@prisma/client';
+import { PDFDocument, type PDFFont, type PDFPage, rgb } from 'pdf-lib';
+import fontkit from '@pdf-lib/fontkit';
 import { ContractTemplateResolver } from './contract-template.resolver';
 
 export type GeneratedPdfFile = {
@@ -21,6 +24,20 @@ export type EnrollmentDocumentsInput = {
   offerLanguage: OfferLanguage;
   courseMode: CourseMode;
   wantsInstallments: boolean;
+  firstName: string;
+  lastName: string;
+  pesel: string;
+  pkkNumber?: string | null;
+  addressLine1: string;
+  addressLine2?: string | null;
+  city: string;
+  postalCode: string;
+  phone: string;
+  email: string;
+  otherDrivingLicenseCategory?: string | null;
+  otherDrivingLicenseNumber?: string | null;
+  hasTramPermit?: boolean;
+  tramPermitNumber?: string | null;
   generatedAt?: Date;
 };
 
@@ -36,9 +53,37 @@ type ResolverEnrollment = Pick<
   offerItem: Pick<OfferItem, 'code' | 'language'>;
 };
 
+type TextPlacement = {
+  pageIndex: number;
+  x: number;
+  y: number;
+  size: number;
+  maxWidth?: number;
+};
+
+type ContractLayout = {
+  cityAndDate: TextPlacement;
+  fullName: TextPlacement;
+  pesel: TextPlacement;
+  address: TextPlacement;
+  pkkNumber: TextPlacement;
+  phone: TextPlacement;
+  email: TextPlacement;
+  drivingCategory: TextPlacement;
+  drivingNumber: TextPlacement;
+  tramPermitNumber: TextPlacement;
+};
+
+type RodoLayout = {
+  cityAndDate: TextPlacement;
+  fullName: TextPlacement;
+  pesel: TextPlacement;
+};
+
 @Injectable()
 export class ContractPdfService {
   constructor(
+    private readonly config: ConfigService,
     private readonly contractTemplateResolver: ContractTemplateResolver,
   ) {}
 
@@ -68,48 +113,483 @@ export class ContractPdfService {
     const storageRoot = this.getStorageRoot();
     const year = String(generatedAt.getFullYear());
     const month = String(generatedAt.getMonth() + 1).padStart(2, '0');
-
     const dir = path.join(storageRoot, 'contracts', year, month);
+
     await mkdir(dir, { recursive: true });
 
-    const contractFile = await this.copyTemplateToOutput({
+    const contractAbsolutePath = path.join(dir, `umowa-${input.fileId}.pdf`);
+    const rodoAbsolutePath = path.join(dir, `rodo-${input.fileId}.pdf`);
+
+    await this.personalizeContractPdf({
       templateAbsolutePath: contractTemplatePath,
-      outputDir: dir,
-      outputFileName: `umowa-${input.fileId}.pdf`,
-      storageRoot,
+      outputAbsolutePath: contractAbsolutePath,
+      input,
+      generatedAt,
     });
 
-    const rodoFile = await this.copyTemplateToOutput({
+    await this.personalizeRodoPdf({
       templateAbsolutePath: rodoTemplatePath,
-      outputDir: dir,
-      outputFileName: `rodo-${input.fileId}.pdf`,
-      storageRoot,
+      outputAbsolutePath: rodoAbsolutePath,
+      input,
+      generatedAt,
     });
 
     return {
-      contract: contractFile,
-      rodo: rodoFile,
+      contract: {
+        fileName: path.basename(contractAbsolutePath),
+        absolutePath: contractAbsolutePath,
+        relativePath: path
+          .relative(storageRoot, contractAbsolutePath)
+          .split(path.sep)
+          .join('/'),
+      },
+      rodo: {
+        fileName: path.basename(rodoAbsolutePath),
+        absolutePath: rodoAbsolutePath,
+        relativePath: path
+          .relative(storageRoot, rodoAbsolutePath)
+          .split(path.sep)
+          .join('/'),
+      },
     };
   }
 
-  private async copyTemplateToOutput(params: {
+  private async personalizeContractPdf(params: {
     templateAbsolutePath: string;
-    outputDir: string;
-    outputFileName: string;
-    storageRoot: string;
-  }): Promise<GeneratedPdfFile> {
-    const absolutePath = path.join(params.outputDir, params.outputFileName);
+    outputAbsolutePath: string;
+    input: EnrollmentDocumentsInput;
+    generatedAt: Date;
+  }) {
+    const templateBytes = await readFile(params.templateAbsolutePath);
+    const pdfDoc = await PDFDocument.load(templateBytes);
 
-    await copyFile(params.templateAbsolutePath, absolutePath);
+    pdfDoc.registerFontkit(fontkit);
+    const font = await pdfDoc.embedFont(await this.readFontBytes());
+
+    const pages = pdfDoc.getPages();
+    if (pages.length === 0) {
+      throw new InternalServerErrorException(
+        'Szablon umowy nie zawiera żadnej strony.',
+      );
+    }
+
+    const page = pages[0];
+    const layout = this.getContractLayout(params.input.offerLanguage);
+
+    const fullName = this.normalizeText(
+      `${params.input.firstName} ${params.input.lastName}`,
+    );
+    const address = this.normalizeText(
+      [
+        params.input.addressLine1,
+        params.input.addressLine2,
+        `${params.input.postalCode} ${params.input.city}`,
+      ]
+        .filter(Boolean)
+        .join(', '),
+    );
+
+    const cityAndDate = this.normalizeText(
+      `${this.getContractPlace()}, ${this.formatDate(params.generatedAt)}`,
+    );
+
+    const drivingCategory = this.normalizeText(
+      params.input.otherDrivingLicenseCategory ?? '',
+    );
+    const drivingNumber = this.normalizeText(
+      params.input.otherDrivingLicenseNumber ?? '',
+    );
+    const tramPermitNumber =
+      params.input.hasTramPermit === true
+        ? this.normalizeText(params.input.tramPermitNumber ?? '')
+        : '';
+
+    this.drawField(page, font, cityAndDate, layout.cityAndDate);
+    this.drawField(page, font, fullName, layout.fullName);
+    this.drawField(
+      page,
+      font,
+      this.normalizeText(params.input.pesel),
+      layout.pesel,
+    );
+    this.drawField(page, font, address, layout.address);
+    this.drawField(
+      page,
+      font,
+      this.normalizeText(params.input.pkkNumber ?? ''),
+      layout.pkkNumber,
+    );
+    this.drawField(
+      page,
+      font,
+      this.normalizeText(params.input.phone),
+      layout.phone,
+    );
+    this.drawField(
+      page,
+      font,
+      this.normalizeText(params.input.email),
+      layout.email,
+    );
+    this.drawField(page, font, drivingCategory, layout.drivingCategory);
+    this.drawField(page, font, drivingNumber, layout.drivingNumber);
+    this.drawField(page, font, tramPermitNumber, layout.tramPermitNumber);
+
+    const pdfBytes = await pdfDoc.save();
+    await writeFile(params.outputAbsolutePath, pdfBytes);
+  }
+
+  private async personalizeRodoPdf(params: {
+    templateAbsolutePath: string;
+    outputAbsolutePath: string;
+    input: EnrollmentDocumentsInput;
+    generatedAt: Date;
+  }) {
+    const templateBytes = await readFile(params.templateAbsolutePath);
+    const pdfDoc = await PDFDocument.load(templateBytes);
+
+    pdfDoc.registerFontkit(fontkit);
+    const font = await pdfDoc.embedFont(await this.readFontBytes());
+
+    const pages = pdfDoc.getPages();
+    if (pages.length === 0) {
+      throw new InternalServerErrorException(
+        'Szablon RODO nie zawiera żadnej strony.',
+      );
+    }
+
+    const page = pages[0];
+    const layout = this.getRodoLayout(params.input.offerLanguage);
+
+    const fullName = this.normalizeText(
+      `${params.input.firstName} ${params.input.lastName}`,
+    );
+    const cityAndDate = this.normalizeText(
+      `${this.getContractPlace()}, ${this.formatDate(params.generatedAt)}`,
+    );
+
+    this.drawField(page, font, cityAndDate, layout.cityAndDate);
+    this.drawField(page, font, fullName, layout.fullName);
+    this.drawField(
+      page,
+      font,
+      this.normalizeText(params.input.pesel),
+      layout.pesel,
+    );
+
+    const pdfBytes = await pdfDoc.save();
+    await writeFile(params.outputAbsolutePath, pdfBytes);
+  }
+
+  private drawField(
+    page: PDFPage,
+    font: PDFFont,
+    value: string,
+    placement: TextPlacement,
+  ) {
+    const text = this.normalizeText(value);
+    if (!text) return;
+
+    const fitted = this.fitTextToWidth(
+      font,
+      text,
+      placement.size,
+      placement.maxWidth,
+    );
+
+    const textWidth = font.widthOfTextAtSize(fitted.text, fitted.size);
+    const backgroundWidth = placement.maxWidth
+      ? Math.min(textWidth, placement.maxWidth)
+      : textWidth;
+
+    page.drawRectangle({
+      x: placement.x - 2,
+      y: placement.y - 2,
+      width: backgroundWidth + 4,
+      height: fitted.size + 5,
+      color: rgb(1, 1, 1),
+    });
+
+    page.drawText(fitted.text, {
+      x: placement.x,
+      y: placement.y,
+      size: fitted.size,
+      font,
+      color: rgb(0, 0, 0),
+    });
+  }
+
+  private fitTextToWidth(
+    font: PDFFont,
+    text: string,
+    baseSize: number,
+    maxWidth?: number,
+  ): { text: string; size: number } {
+    if (!maxWidth) {
+      return { text, size: baseSize };
+    }
+
+    let currentSize = baseSize;
+    let currentText = text;
+
+    while (
+      currentSize > 6 &&
+      font.widthOfTextAtSize(currentText, currentSize) > maxWidth
+    ) {
+      currentSize -= 0.25;
+    }
+
+    while (
+      font.widthOfTextAtSize(currentText, currentSize) > maxWidth &&
+      currentText.length > 4
+    ) {
+      currentText = `${currentText.slice(0, -2).trimEnd()}...`;
+    }
 
     return {
-      fileName: params.outputFileName,
-      absolutePath,
-      relativePath: path
-        .relative(params.storageRoot, absolutePath)
-        .split(path.sep)
-        .join('/'),
+      text: currentText,
+      size: currentSize,
     };
+  }
+
+  private getContractLayout(language: OfferLanguage): ContractLayout {
+    if (language === 'EN') {
+      return {
+        cityAndDate: {
+          pageIndex: 0,
+          x: 382,
+          y: 804,
+          size: 10,
+          maxWidth: 165,
+        },
+        fullName: {
+          pageIndex: 0,
+          x: 146,
+          y: 744,
+          size: 10,
+          maxWidth: 210,
+        },
+        pesel: {
+          pageIndex: 0,
+          x: 472,
+          y: 744,
+          size: 10,
+          maxWidth: 84,
+        },
+        address: {
+          pageIndex: 0,
+          x: 98,
+          y: 726,
+          size: 10,
+          maxWidth: 455,
+        },
+        pkkNumber: {
+          pageIndex: 0,
+          x: 92,
+          y: 708,
+          size: 10,
+          maxWidth: 210,
+        },
+        phone: {
+          pageIndex: 0,
+          x: 432,
+          y: 708,
+          size: 10,
+          maxWidth: 120,
+        },
+        email: {
+          pageIndex: 0,
+          x: 108,
+          y: 690,
+          size: 10,
+          maxWidth: 250,
+        },
+        drivingCategory: {
+          pageIndex: 0,
+          x: 455,
+          y: 690,
+          size: 10,
+          maxWidth: 85,
+        },
+        drivingNumber: {
+          pageIndex: 0,
+          x: 305,
+          y: 672,
+          size: 10,
+          maxWidth: 125,
+        },
+        tramPermitNumber: {
+          pageIndex: 0,
+          x: 455,
+          y: 672,
+          size: 10,
+          maxWidth: 92,
+        },
+      };
+    }
+
+    return {
+      cityAndDate: {
+        pageIndex: 0,
+        x: 383,
+        y: 804,
+        size: 10,
+        maxWidth: 165,
+      },
+      fullName: {
+        pageIndex: 0,
+        x: 160,
+        y: 744,
+        size: 10,
+        maxWidth: 220,
+      },
+      pesel: {
+        pageIndex: 0,
+        x: 474,
+        y: 744,
+        size: 10,
+        maxWidth: 82,
+      },
+      address: {
+        pageIndex: 0,
+        x: 132,
+        y: 726,
+        size: 10,
+        maxWidth: 420,
+      },
+      pkkNumber: {
+        pageIndex: 0,
+        x: 86,
+        y: 708,
+        size: 10,
+        maxWidth: 210,
+      },
+      phone: {
+        pageIndex: 0,
+        x: 432,
+        y: 708,
+        size: 10,
+        maxWidth: 120,
+      },
+      email: {
+        pageIndex: 0,
+        x: 110,
+        y: 690,
+        size: 10,
+        maxWidth: 245,
+      },
+      drivingCategory: {
+        pageIndex: 0,
+        x: 470,
+        y: 690,
+        size: 10,
+        maxWidth: 74,
+      },
+      drivingNumber: {
+        pageIndex: 0,
+        x: 74,
+        y: 672,
+        size: 10,
+        maxWidth: 135,
+      },
+      tramPermitNumber: {
+        pageIndex: 0,
+        x: 382,
+        y: 672,
+        size: 10,
+        maxWidth: 166,
+      },
+    };
+  }
+
+  private getRodoLayout(language: OfferLanguage): RodoLayout {
+    if (language === 'EN') {
+      return {
+        cityAndDate: {
+          pageIndex: 0,
+          x: 90,
+          y: 804,
+          size: 10,
+          maxWidth: 180,
+        },
+        fullName: {
+          pageIndex: 0,
+          x: 228,
+          y: 743,
+          size: 10,
+          maxWidth: 270,
+        },
+        pesel: {
+          pageIndex: 0,
+          x: 248,
+          y: 723,
+          size: 10,
+          maxWidth: 210,
+        },
+      };
+    }
+
+    return {
+      cityAndDate: {
+        pageIndex: 0,
+        x: 88,
+        y: 804,
+        size: 10,
+        maxWidth: 180,
+      },
+      fullName: {
+        pageIndex: 0,
+        x: 166,
+        y: 744,
+        size: 10,
+        maxWidth: 270,
+      },
+      pesel: {
+        pageIndex: 0,
+        x: 247,
+        y: 724,
+        size: 10,
+        maxWidth: 205,
+      },
+    };
+  }
+
+  private formatDate(date: Date): string {
+    const day = String(date.getDate()).padStart(2, '0');
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const year = String(date.getFullYear());
+    return `${day}.${month}.${year}`;
+  }
+
+  private normalizeText(value: string): string {
+    return value.replace(/\s+/g, ' ').trim();
+  }
+
+  private getContractPlace(): string {
+    return this.config.get<string>('CONTRACT_PLACE')?.trim() || 'Wrocław';
+  }
+
+  private async readFontBytes(): Promise<Uint8Array> {
+    const configured = this.config.get<string>('PDF_FONT_PATH');
+
+    const candidates = [
+      configured ? path.resolve(process.cwd(), configured) : null,
+      path.resolve(process.cwd(), 'assets', 'fonts', 'arial.ttf'),
+      '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf',
+      '/usr/share/fonts/truetype/liberation2/LiberationSans-Regular.ttf',
+    ].filter((value): value is string => Boolean(value));
+
+    for (const candidate of candidates) {
+      try {
+        return await readFile(candidate);
+      } catch {
+        continue;
+      }
+    }
+
+    throw new InternalServerErrorException(
+      'Nie znaleziono czcionki do generowania PDF. Ustaw PDF_FONT_PATH albo dodaj plik assets/fonts/arial.ttf.',
+    );
   }
 
   private getStorageRoot() {
