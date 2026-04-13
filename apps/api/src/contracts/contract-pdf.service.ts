@@ -174,7 +174,7 @@ export class ContractPdfService {
     }
 
     const page = pages[0];
-    const layout = this.getContractLayout(params.input.offerLanguage);
+    const layout = this.getContractLayout();
 
     const fullName = this.normalizeText(
       `${params.input.firstName} ${params.input.lastName}`,
@@ -259,7 +259,7 @@ export class ContractPdfService {
     }
 
     const page = pages[0];
-    const layout = this.getRodoLayout(params.input.offerLanguage);
+    const layout = this.getRodoLayout();
 
     const fullName = this.normalizeText(
       `${params.input.firstName} ${params.input.lastName}`,
@@ -352,204 +352,103 @@ export class ContractPdfService {
     };
   }
 
-  private getContractLayout(language: OfferLanguage): ContractLayout {
-    if (language === 'EN') {
-      return {
-        cityAndDate: {
-          pageIndex: 0,
-          x: 382,
-          y: 804,
-          size: 10,
-          maxWidth: 165,
-        },
-        fullName: {
-          pageIndex: 0,
-          x: 146,
-          y: 744,
-          size: 10,
-          maxWidth: 210,
-        },
-        pesel: {
-          pageIndex: 0,
-          x: 472,
-          y: 744,
-          size: 10,
-          maxWidth: 84,
-        },
-        address: {
-          pageIndex: 0,
-          x: 98,
-          y: 726,
-          size: 10,
-          maxWidth: 455,
-        },
-        pkkNumber: {
-          pageIndex: 0,
-          x: 92,
-          y: 708,
-          size: 10,
-          maxWidth: 210,
-        },
-        phone: {
-          pageIndex: 0,
-          x: 432,
-          y: 708,
-          size: 10,
-          maxWidth: 120,
-        },
-        email: {
-          pageIndex: 0,
-          x: 108,
-          y: 690,
-          size: 10,
-          maxWidth: 250,
-        },
-        drivingCategory: {
-          pageIndex: 0,
-          x: 455,
-          y: 690,
-          size: 10,
-          maxWidth: 85,
-        },
-        drivingNumber: {
-          pageIndex: 0,
-          x: 305,
-          y: 672,
-          size: 10,
-          maxWidth: 125,
-        },
-        tramPermitNumber: {
-          pageIndex: 0,
-          x: 455,
-          y: 672,
-          size: 10,
-          maxWidth: 92,
-        },
-      };
-    }
-
+  private getContractLayout(): ContractLayout {
     return {
       cityAndDate: {
         pageIndex: 0,
-        x: 383,
+        x: 418,
         y: 804,
         size: 10,
-        maxWidth: 165,
+        maxWidth: 145,
       },
       fullName: {
         pageIndex: 0,
-        x: 160,
-        y: 744,
+        x: 154,
+        y: 658,
         size: 10,
-        maxWidth: 220,
+        maxWidth: 250,
       },
       pesel: {
         pageIndex: 0,
-        x: 474,
-        y: 744,
+        x: 505,
+        y: 658,
         size: 10,
-        maxWidth: 82,
+        maxWidth: 88,
       },
       address: {
         pageIndex: 0,
-        x: 132,
-        y: 726,
+        x: 88,
+        y: 631,
         size: 10,
-        maxWidth: 420,
+        maxWidth: 470,
       },
       pkkNumber: {
         pageIndex: 0,
-        x: 86,
-        y: 708,
+        x: 88,
+        y: 604,
         size: 10,
-        maxWidth: 210,
+        maxWidth: 230,
       },
       phone: {
         pageIndex: 0,
-        x: 432,
-        y: 708,
+        x: 468,
+        y: 604,
         size: 10,
-        maxWidth: 120,
+        maxWidth: 110,
       },
       email: {
         pageIndex: 0,
-        x: 110,
-        y: 690,
+        x: 131,
+        y: 577,
         size: 10,
-        maxWidth: 245,
+        maxWidth: 210,
       },
       drivingCategory: {
         pageIndex: 0,
-        x: 470,
-        y: 690,
+        x: 87,
+        y: 550,
         size: 10,
-        maxWidth: 74,
+        maxWidth: 70,
       },
       drivingNumber: {
         pageIndex: 0,
-        x: 74,
-        y: 672,
+        x: 286,
+        y: 550,
         size: 10,
-        maxWidth: 135,
+        maxWidth: 185,
       },
       tramPermitNumber: {
         pageIndex: 0,
-        x: 382,
-        y: 672,
+        x: 286,
+        y: 550,
         size: 10,
-        maxWidth: 166,
+        maxWidth: 185,
       },
     };
   }
 
-  private getRodoLayout(language: OfferLanguage): RodoLayout {
-    if (language === 'EN') {
-      return {
-        cityAndDate: {
-          pageIndex: 0,
-          x: 90,
-          y: 804,
-          size: 10,
-          maxWidth: 180,
-        },
-        fullName: {
-          pageIndex: 0,
-          x: 228,
-          y: 743,
-          size: 10,
-          maxWidth: 270,
-        },
-        pesel: {
-          pageIndex: 0,
-          x: 248,
-          y: 723,
-          size: 10,
-          maxWidth: 210,
-        },
-      };
-    }
-
+  private getRodoLayout(): RodoLayout {
     return {
       cityAndDate: {
         pageIndex: 0,
-        x: 88,
+        x: 92,
         y: 804,
         size: 10,
         maxWidth: 180,
       },
       fullName: {
         pageIndex: 0,
-        x: 166,
-        y: 744,
+        x: 266,
+        y: 567,
         size: 10,
-        maxWidth: 270,
+        maxWidth: 285,
       },
       pesel: {
         pageIndex: 0,
-        x: 247,
-        y: 724,
+        x: 438,
+        y: 541,
         size: 10,
-        maxWidth: 205,
+        maxWidth: 190,
       },
     };
   }
