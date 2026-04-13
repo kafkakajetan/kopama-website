@@ -370,7 +370,7 @@ export class ContractPdfService {
       },
       pesel: {
         pageIndex: 0,
-        x: 492,
+        x: 484,
         y: 654,
         size: 10,
         maxWidth: 88,
@@ -392,14 +392,14 @@ export class ContractPdfService {
       phone: {
         pageIndex: 0,
         x: 456,
-        y: 608,
+        y: 611,
         size: 10,
         maxWidth: 110,
       },
       email: {
         pageIndex: 0,
         x: 131,
-        y: 583,
+        y: 587,
         size: 10,
         maxWidth: 210,
       },
@@ -439,14 +439,14 @@ export class ContractPdfService {
       fullName: {
         pageIndex: 0,
         x: 304,
-        y: 594,
+        y: 667,
         size: 10,
         maxWidth: 250,
       },
       pesel: {
         pageIndex: 0,
         x: 438,
-        y: 567,
+        y: 639,
         size: 10,
         maxWidth: 180,
       },
