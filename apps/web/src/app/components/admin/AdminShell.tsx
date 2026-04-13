@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import type { ReactNode } from 'react';
+import Image from "next/image";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
@@ -42,11 +43,7 @@ export function AdminShell({ children }: Props) {
         <div className="admin-page">
             <div className="nav">
                 <Link className="brand" href="/start">
-                    <div className="logo">K</div>
-                    <div className="title">
-                        <strong>KopaMa – Panel</strong>
-                        <span>Administrator</span>
-                    </div>
+                    <Image src="/logo.png" alt="logo" height={100} width={200}/>
                 </Link>
 
                 <div className="nav-actions">

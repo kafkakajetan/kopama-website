@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Image from "next/image";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
@@ -211,11 +212,7 @@ export default function PanelPage() {
         <>
             <div className="nav">
                 <Link className="brand" href="/start">
-                    <div className="logo">K</div>
-                    <div className="title">
-                        <strong>KopaMa – Panel</strong>
-                        <span>Administrator</span>
-                    </div>
+                    <Image src="/logo.png" alt="logo" height={100} width={200}/>
                 </Link>
 
                 <div className="nav-actions">

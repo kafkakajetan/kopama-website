@@ -332,38 +332,60 @@ export default function AdminContractsPage() {
                                 />
 
                                 <div style={{ display: 'grid', gap: 10, marginBottom: 18 }}>
-                                    {filteredTargets.map((target) => (
-                                        <label
-                                            key={target.id}
-                                            style={{
-                                                display: 'block',
-                                                border: selectedEnrollmentId === target.id
-                                                    ? '2px solid #0f3fb8'
-                                                    : '1px solid #d1d5db',
-                                                borderRadius: 14,
-                                                padding: 14,
-                                                background: '#fff',
-                                                cursor: 'pointer',
-                                            }}
-                                        >
-                                            <input
-                                                type="radio"
-                                                name="selectedEnrollment"
-                                                value={target.id}
-                                                checked={selectedEnrollmentId === target.id}
-                                                onChange={() => setSelectedEnrollmentId(target.id)}
-                                                style={{ marginRight: 10 }}
-                                            />
-                                            <strong>{target.firstName} {target.lastName}</strong>
-                                            <div style={{ fontSize: 14, marginTop: 6 }}>
-                                                {target.courseCategory.name} •{' '}
-                                                {target.courseMode === 'ELEARNING' ? 'e-learning' : 'stacjonarny'}
-                                            </div>
-                                            <div style={{ fontSize: 13, opacity: 0.75, marginTop: 4 }}>
-                                                Zapis: {new Date(target.createdAt).toLocaleString('pl-PL')}
-                                            </div>
-                                        </label>
-                                    ))}
+                                    {filteredTargets.map((target) => {
+                                        const isSelected = selectedEnrollmentId === target.id;
+
+                                        return (
+                                            <label
+                                                key={target.id}
+                                                style={{
+                                                    display: 'block',
+                                                    border: isSelected ? '2px solid #0f3fb8' : '1px solid #d1d5db',
+                                                    borderRadius: 18,
+                                                    padding: 20,
+                                                    background: isSelected ? '#eef4ff' : '#fff',
+                                                    cursor: 'pointer',
+                                                    transition: 'all .15s ease',
+                                                    boxShadow: isSelected ? '0 8px 24px rgba(15, 63, 184, 0.10)' : 'none',
+                                                }}
+                                            >
+                                                <input
+                                                    type="radio"
+                                                    name="selectedEnrollment"
+                                                    value={target.id}
+                                                    checked={isSelected}
+                                                    onChange={() => setSelectedEnrollmentId(target.id)}
+                                                    style={{
+                                                        position: 'absolute',
+                                                        opacity: 0,
+                                                        pointerEvents: 'none',
+                                                        width: 0,
+                                                        height: 0,
+                                                    }}
+                                                />
+                                                <div
+                                                    style={{
+                                                        fontSize: 30,
+                                                        fontWeight: 800,
+                                                        lineHeight: 1.1,
+                                                        marginBottom: 12,
+                                                        color: '#111827',
+                                                    }}
+                                                >
+                                                    {target.firstName} {target.lastName}
+                                                </div>
+
+                                                <div style={{ fontSize: 18, fontWeight: 600, marginTop: 4 }}>
+                                                    {target.courseCategory.name} •{' '}
+                                                    {target.courseMode === 'ELEARNING' ? 'e-learning' : 'stacjonarny'}
+                                                </div>
+
+                                                <div style={{ fontSize: 15, opacity: 0.75, marginTop: 8 }}>
+                                                    Zapis: {new Date(target.createdAt).toLocaleString('pl-PL')}
+                                                </div>
+                                            </label>
+                                        );
+                                    })}
 
                                     {filteredTargets.length === 0 ? (
                                         <div style={{ fontSize: 14, opacity: 0.75 }}>
