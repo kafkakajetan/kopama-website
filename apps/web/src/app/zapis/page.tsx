@@ -1232,6 +1232,20 @@ export default function ZapisPage() {
                                                 <label htmlFor="acceptedSitePolicies" style={{ margin: 0, cursor: 'pointer' }}>
                                                     Akceptuję{' '}
                                                     <a
+                                                        href="https://kopama.pl/regulamin-sprzedaży"
+                                                        target="_blank"
+                                                        rel="noreferrer"
+                                                        onClick={(e) => e.stopPropagation()}
+                                                        style={{
+                                                            color: '#0b3bb3',
+                                                            textDecoration: 'underline',
+                                                            fontWeight: 600,
+                                                        }}
+                                                    >
+                                                        postanowienia regulaminu strony
+                                                    </a>
+                                                    i
+                                                    <a
                                                         href="https://kopama.pl/polityka-prywatnosci"
                                                         target="_blank"
                                                         rel="noreferrer"
@@ -1242,7 +1256,7 @@ export default function ZapisPage() {
                                                             fontWeight: 600,
                                                         }}
                                                     >
-                                                        postanowienia regulaminu strony i polityki prywatności
+                                                        polityki prywatności
                                                     </a>
                                                     <span
                                                         aria-hidden="true"
@@ -1541,7 +1555,7 @@ export default function ZapisPage() {
                                                 <label htmlFor="acceptedSalesTerms" style={{ margin: 0, cursor: 'pointer' }}>
                                                     Potwierdzam zapoznanie się z{' '}
                                                     <a
-                                                        href="https://kopama.pl/regulamin-sprzedazy"
+                                                        href="https://kopama.pl/regulamin-sprzedaży"
                                                         target="_blank"
                                                         rel="noreferrer"
                                                         onClick={(e) => e.stopPropagation()}
