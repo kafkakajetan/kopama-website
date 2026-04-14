@@ -422,6 +422,17 @@ export class EnrollmentsService {
         studentEmail: createdEnrollment.email,
         courseName: createdEnrollment.offerItem.name,
         paymentSummary: 'gotówka',
+        courseModeLabel:
+          createdEnrollment.courseMode === 'ELEARNING'
+            ? 'E-learning'
+            : 'Stacjonarnie',
+        courseStartDateLabel:
+          createdEnrollment.courseMode !== 'ELEARNING' &&
+          createdEnrollment.courseStartDate
+            ? new Date(createdEnrollment.courseStartDate).toLocaleDateString(
+                'pl-PL',
+              )
+            : undefined,
       });
     }
 
@@ -499,6 +510,12 @@ export class EnrollmentsService {
       paymentSummary: enrollment.wantsInstallments
         ? 'opłacona pierwsza rata'
         : 'opłacony cały kurs',
+      courseModeLabel:
+        enrollment.courseMode === 'ELEARNING' ? 'E-learning' : 'Stacjonarnie',
+      courseStartDateLabel:
+        enrollment.courseMode !== 'ELEARNING' && enrollment.courseStartDate
+          ? new Date(enrollment.courseStartDate).toLocaleDateString('pl-PL')
+          : undefined,
     });
 
     return {
@@ -516,6 +533,8 @@ export class EnrollmentsService {
     studentEmail: string;
     courseName: string;
     paymentSummary: string;
+    courseModeLabel: string;
+    courseStartDateLabel?: string;
   }) {
     try {
       await this.mailService.sendNewStudentNotificationEmail({
@@ -524,6 +543,8 @@ export class EnrollmentsService {
         studentEmail: params.studentEmail,
         courseName: params.courseName,
         paymentSummary: params.paymentSummary,
+        courseModeLabel: params.courseModeLabel,
+        courseStartDateLabel: params.courseStartDateLabel,
       });
     } catch (error: unknown) {
       this.logger.error(

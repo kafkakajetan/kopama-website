@@ -21,6 +21,8 @@ type SendNewStudentNotificationEmailParams = {
   studentEmail: string;
   courseName: string;
   paymentSummary: string;
+  courseModeLabel: string;
+  courseStartDateLabel?: string;
 };
 
 function escapeHtml(value: string): string {
@@ -113,6 +115,9 @@ export class MailService {
       ? escapeHtml(params.plainPassword)
       : '';
 
+    const shellShadow = '0 28px 70px rgba(0,0,0,.21)';
+    const cardShadow = '0 12px 28px rgba(15,23,42,.09)';
+
     const minorWarningText = params.isMinor
       ? [
           'WAŻNE:',
@@ -124,7 +129,7 @@ export class MailService {
       ? `
         <tr>
           <td style="padding:0 0 20px 0;">
-            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="border-collapse:collapse; border:1px solid #dc2626; border-radius:14px; background:#fff5f5; box-shadow:0 10px 24px rgba(15,23,42,.08);">
+            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" bgcolor="#fff5f5" style="border-collapse:collapse; border:1px solid #dc2626; border-radius:14px; background:#fff5f5; box-shadow:${cardShadow};">
               <tr>
                 <td style="padding:16px 18px; font-family:Arial, Helvetica, sans-serif; font-size:14px; line-height:21px; color:#991b1b;">
                   <strong style="display:block; margin-bottom:8px;">Ważna informacja dla osoby niepełnoletniej</strong>
@@ -151,7 +156,7 @@ export class MailService {
         ? `
           <tr>
             <td style="padding:0 0 20px 0;">
-              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="border-collapse:collapse; border:1px solid #d6d9e0; border-radius:14px; background:#ffffff; box-shadow:0 10px 24px rgba(15,23,42,.08);">
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" bgcolor="#ffffff" style="border-collapse:collapse; border:1px solid #d6d9e0; border-radius:14px; background:#ffffff; box-shadow:${cardShadow};">
                 <tr>
                   <td style="padding:16px 18px; font-family:Arial, Helvetica, sans-serif; font-size:14px; line-height:21px; color:#1f2937;">
                     <strong style="display:block; margin-bottom:8px;">Dane do logowania do panelu kursanta</strong>
@@ -168,7 +173,7 @@ export class MailService {
     const panelButtonHtml = `
       <tr>
         <td style="padding:0 0 20px 0;">
-          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="border-collapse:collapse; border-radius:14px; background:#ffffff; box-shadow:0 10px 24px rgba(15,23,42,.08);">
+          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" bgcolor="#ffffff" style="border-collapse:collapse; border-radius:14px; background:#ffffff; box-shadow:${cardShadow};">
             <tr>
               <td align="center" style="padding:20px 18px;">
                 <a href="${panelLoginUrl}" style="display:inline-block; background:#081f44; color:#ffffff; text-decoration:none; font-family:Arial, Helvetica, sans-serif; font-size:15px; font-weight:700; padding:14px 24px; border-radius:14px;">
@@ -224,32 +229,40 @@ export class MailService {
           <head>
             <meta charset="utf-8" />
             <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+            <meta name="color-scheme" content="light only" />
+            <meta name="supported-color-schemes" content="light only" />
             <title>OSK KopaMa – dokumenty do podpisu</title>
+            <style>
+              :root { color-scheme: light only !important; }
+              body, table, td, div, p, a {
+                font-family: Arial, Helvetica, sans-serif !important;
+              }
+            </style>
           </head>
-          <body style="margin:0; padding:0; background:#0b3bb3;">
-            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="border-collapse:collapse; background:#0b3bb3; margin:0; padding:0;">
+          <body bgcolor="#0b3bb3" style="margin:0; padding:0; background:#0b3bb3;">
+            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" bgcolor="#0b3bb3" style="border-collapse:collapse; background:#0b3bb3; margin:0; padding:0;">
               <tr>
                 <td align="center" style="padding:32px 16px;">
-                  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="border-collapse:collapse; max-width:680px; background:#f3f4f6; border-radius:24px; overflow:hidden; box-shadow:0 24px 60px rgba(0,0,0,.18);">
+                  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" bgcolor="#f3f4f6" style="border-collapse:collapse; max-width:680px; background:#f3f4f6; border-radius:24px; overflow:hidden; box-shadow:${shellShadow};">
                     <tr>
-                      <td style="padding:36px 32px 28px 32px; background:#0b3bb3; text-align:center;">
-                        <div style="font-family:Arial, Helvetica, sans-serif; font-size:13px; line-height:20px; color:#ffffff; font-weight:700; margin-bottom:10px;">
+                      <td bgcolor="#0b3bb3" style="padding:36px 32px 28px 32px; background:#0b3bb3; text-align:center;">
+                        <div style="font-size:13px; line-height:20px; color:#ffffff; font-weight:700; margin-bottom:10px;">
                           Zakup kursu online
                         </div>
-                        <div style="font-family:Arial, Helvetica, sans-serif; font-size:36px; line-height:42px; color:#ffffff; font-weight:800; margin-bottom:10px;">
+                        <div style="font-size:36px; line-height:42px; color:#ffffff; font-weight:800; margin-bottom:10px;">
                           Dokumenty do podpisu
                         </div>
-                        <div style="font-family:Arial, Helvetica, sans-serif; font-size:16px; line-height:24px; color:#f4e3c3;">
+                        <div style="font-size:16px; line-height:24px; color:#f4e3c3;">
                           OSK KopaMa
                         </div>
                       </td>
                     </tr>
 
                     <tr>
-                      <td style="padding:30px 28px 32px 28px;">
+                      <td bgcolor="#f3f4f6" style="padding:30px 28px 32px 28px; background:#f3f4f6;">
                         <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="border-collapse:collapse;">
                           <tr>
-                            <td style="padding:0 0 20px 0; font-family:Arial, Helvetica, sans-serif; font-size:15px; line-height:24px; color:#1f2937;">
+                            <td style="padding:0 0 20px 0; font-size:15px; line-height:24px; color:#1f2937;">
                               Dzień dobry <strong>${escapedFullName}</strong>,
                               <br /><br />
                               w załączniku przesyłamy dokumenty do podpisu związane z zapisem na kurs.
@@ -260,9 +273,9 @@ export class MailService {
 
                           <tr>
                             <td style="padding:0 0 20px 0;">
-                              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="border-collapse:collapse; border:1px solid #d6d9e0; border-radius:14px; background:#ffffff; box-shadow:0 10px 24px rgba(15,23,42,.08);">
+                              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" bgcolor="#ffffff" style="border-collapse:collapse; border:1px solid #d6d9e0; border-radius:14px; background:#ffffff; box-shadow:${cardShadow};">
                                 <tr>
-                                  <td style="padding:16px 18px; font-family:Arial, Helvetica, sans-serif; font-size:14px; line-height:22px; color:#1f2937;">
+                                  <td style="padding:16px 18px; font-size:14px; line-height:22px; color:#1f2937;">
                                     <strong style="display:block; margin-bottom:8px;">Załączniki</strong>
                                     <div>1. Umowa w formacie PDF</div>
                                     ${
@@ -278,9 +291,9 @@ export class MailService {
 
                           <tr>
                             <td style="padding:0 0 20px 0;">
-                              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="border-collapse:collapse; border:1px solid #d6d9e0; border-radius:14px; background:#ffffff; box-shadow:0 10px 24px rgba(15,23,42,.08);">
+                              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" bgcolor="#ffffff" style="border-collapse:collapse; border:1px solid #d6d9e0; border-radius:14px; background:#ffffff; box-shadow:${cardShadow};">
                                 <tr>
-                                  <td style="padding:16px 18px; font-family:Arial, Helvetica, sans-serif; font-size:14px; line-height:22px; color:#1f2937;">
+                                  <td style="padding:16px 18px; font-size:14px; line-height:22px; color:#1f2937;">
                                     <strong style="display:block; margin-bottom:8px;">Podpis elektroniczny</strong>
                                     Dokumenty możesz podpisać elektronicznie przy użyciu Profilu Zaufanego.
                                     <br /><br />
@@ -297,7 +310,7 @@ export class MailService {
                           ${panelButtonHtml}
 
                           <tr>
-                            <td style="padding:0; font-family:Arial, Helvetica, sans-serif; font-size:14px; line-height:22px; color:#4b5563;">
+                            <td style="padding:0; font-size:14px; line-height:22px; color:#4b5563;">
                               Po podpisaniu dokumentów zachowaj je zgodnie z dalszymi instrukcjami szkoły.
                               <br /><br />
                               Pozdrawiamy,
@@ -335,6 +348,13 @@ export class MailService {
     const escapedStudentEmail = escapeHtml(params.studentEmail);
     const escapedCourseName = escapeHtml(params.courseName);
     const escapedPaymentSummary = escapeHtml(params.paymentSummary);
+    const escapedCourseModeLabel = escapeHtml(params.courseModeLabel);
+    const escapedCourseStartDateLabel = params.courseStartDateLabel
+      ? escapeHtml(params.courseStartDateLabel)
+      : '';
+
+    const shellShadow = '0 28px 70px rgba(0,0,0,.21)';
+    const cardShadow = '0 12px 28px rgba(15,23,42,.09)';
 
     const text = [
       'Nowy kursant w systemie.',
@@ -343,8 +363,14 @@ export class MailService {
       `Telefon: ${params.phone}`,
       `Email kursanta: ${params.studentEmail}`,
       `Kurs: ${params.courseName}`,
+      `Tryb kursu: ${params.courseModeLabel}`,
+      params.courseStartDateLabel
+        ? `Termin rozpoczęcia kursu: ${params.courseStartDateLabel}`
+        : null,
       `Sposób płatności: ${params.paymentSummary}`,
-    ].join('\n');
+    ]
+      .filter(Boolean)
+      .join('\n');
 
     const mailOptions: SendMailOptions = {
       from,
@@ -357,60 +383,86 @@ export class MailService {
           <head>
             <meta charset="utf-8" />
             <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+            <meta name="color-scheme" content="light only" />
+            <meta name="supported-color-schemes" content="light only" />
             <title>OSK KopaMa – nowy kursant</title>
+            <style>
+              :root { color-scheme: light only !important; }
+              body, table, td, div, p, a {
+                font-family: Arial, Helvetica, sans-serif !important;
+              }
+            </style>
           </head>
-          <body style="margin:0; padding:0; background:#0b3bb3;">
-            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="border-collapse:collapse; background:#0b3bb3;">
+          <body bgcolor="#0b3bb3" style="margin:0; padding:0; background:#0b3bb3;">
+            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" bgcolor="#0b3bb3" style="border-collapse:collapse; background:#0b3bb3;">
               <tr>
                 <td align="center" style="padding:32px 16px;">
-                  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="border-collapse:collapse; max-width:680px; background:#f3f4f6; border-radius:24px; overflow:hidden; box-shadow:0 24px 60px rgba(0,0,0,.18);">
+                  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" bgcolor="#f3f4f6" style="border-collapse:collapse; max-width:680px; background:#f3f4f6; border-radius:24px; overflow:hidden; box-shadow:${shellShadow};">
                     <tr>
-                      <td style="padding:32px 28px; background:#0b3bb3; text-align:center;">
-                        <div style="font-family:Arial, Helvetica, sans-serif; font-size:13px; line-height:20px; color:#ffffff; font-weight:700; margin-bottom:10px;">
+                      <td bgcolor="#0b3bb3" style="padding:32px 28px; background:#0b3bb3; text-align:center;">
+                        <div style="font-size:13px; line-height:20px; color:#ffffff; font-weight:700; margin-bottom:10px;">
                           Powiadomienie systemowe
                         </div>
-                        <div style="font-family:Arial, Helvetica, sans-serif; font-size:32px; line-height:38px; color:#ffffff; font-weight:800; margin-bottom:8px;">
+                        <div style="font-size:32px; line-height:38px; color:#ffffff; font-weight:800; margin-bottom:8px;">
                           Nowy kursant
                         </div>
-                        <div style="font-family:Arial, Helvetica, sans-serif; font-size:16px; line-height:24px; color:#f4e3c3;">
+                        <div style="font-size:16px; line-height:24px; color:#f4e3c3;">
                           ${escapeHtml(senderName)}
                         </div>
                       </td>
                     </tr>
 
                     <tr>
-                      <td style="padding:28px;">
-                        <div style="font-family:Arial, Helvetica, sans-serif; font-size:15px; line-height:24px; color:#1f2937; margin-bottom:18px;">
+                      <td bgcolor="#f3f4f6" style="padding:28px; background:#f3f4f6;">
+                        <div style="font-size:15px; line-height:24px; color:#1f2937; margin-bottom:18px;">
                           Do systemu został dodany nowy kursant. Najważniejsze dane:
                         </div>
 
                         <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="border-collapse:separate; border-spacing:0 12px;">
                           <tr>
-                            <td style="padding:16px 18px; background:#ffffff; border:1px solid #d6d9e0; border-radius:14px; box-shadow:0 10px 24px rgba(15,23,42,.08); font-family:Arial, Helvetica, sans-serif; color:#111827;">
+                            <td bgcolor="#ffffff" style="padding:16px 18px; background:#ffffff; border:1px solid #d6d9e0; border-radius:14px; box-shadow:${cardShadow}; color:#111827;">
                               <div style="font-size:13px; color:#6b7280; margin-bottom:4px;">Imię i nazwisko</div>
                               <div style="font-size:24px; font-weight:800;">${escapedFullName}</div>
                             </td>
                           </tr>
                           <tr>
-                            <td style="padding:16px 18px; background:#ffffff; border:1px solid #d6d9e0; border-radius:14px; box-shadow:0 10px 24px rgba(15,23,42,.08); font-family:Arial, Helvetica, sans-serif; color:#111827;">
+                            <td bgcolor="#ffffff" style="padding:16px 18px; background:#ffffff; border:1px solid #d6d9e0; border-radius:14px; box-shadow:${cardShadow}; color:#111827;">
                               <div style="font-size:13px; color:#6b7280; margin-bottom:4px;">Telefon</div>
                               <div style="font-size:20px; font-weight:700;">${escapedPhone}</div>
                             </td>
                           </tr>
                           <tr>
-                            <td style="padding:16px 18px; background:#ffffff; border:1px solid #d6d9e0; border-radius:14px; box-shadow:0 10px 24px rgba(15,23,42,.08); font-family:Arial, Helvetica, sans-serif; color:#111827;">
+                            <td bgcolor="#ffffff" style="padding:16px 18px; background:#ffffff; border:1px solid #d6d9e0; border-radius:14px; box-shadow:${cardShadow}; color:#111827;">
                               <div style="font-size:13px; color:#6b7280; margin-bottom:4px;">Email kursanta</div>
                               <div style="font-size:20px; font-weight:700;">${escapedStudentEmail}</div>
                             </td>
                           </tr>
                           <tr>
-                            <td style="padding:16px 18px; background:#ffffff; border:1px solid #d6d9e0; border-radius:14px; box-shadow:0 10px 24px rgba(15,23,42,.08); font-family:Arial, Helvetica, sans-serif; color:#111827;">
+                            <td bgcolor="#ffffff" style="padding:16px 18px; background:#ffffff; border:1px solid #d6d9e0; border-radius:14px; box-shadow:${cardShadow}; color:#111827;">
                               <div style="font-size:13px; color:#6b7280; margin-bottom:4px;">Kurs</div>
                               <div style="font-size:20px; font-weight:700;">${escapedCourseName}</div>
                             </td>
                           </tr>
                           <tr>
-                            <td style="padding:16px 18px; background:#eef4ff; border:1px solid #9db7ff; border-radius:14px; box-shadow:0 10px 24px rgba(15,23,42,.08); font-family:Arial, Helvetica, sans-serif; color:#0f172a;">
+                            <td bgcolor="#ffffff" style="padding:16px 18px; background:#ffffff; border:1px solid #d6d9e0; border-radius:14px; box-shadow:${cardShadow}; color:#111827;">
+                              <div style="font-size:13px; color:#6b7280; margin-bottom:4px;">Tryb kursu</div>
+                              <div style="font-size:20px; font-weight:700;">${escapedCourseModeLabel}</div>
+                            </td>
+                          </tr>
+                          ${
+                            params.courseStartDateLabel
+                              ? `
+                                                    <tr>
+                                                      <td bgcolor="#ffffff" style="padding:16px 18px; background:#ffffff; border:1px solid #d6d9e0; border-radius:14px; box-shadow:${cardShadow}; color:#111827;">
+                                                        <div style="font-size:13px; color:#6b7280; margin-bottom:4px;">Termin rozpoczęcia kursu</div>
+                                                        <div style="font-size:20px; font-weight:700;">${escapedCourseStartDateLabel}</div>
+                                                      </td>
+                                                    </tr>
+                                                  `
+                              : ''
+                          }
+                          <tr>
+                            <td bgcolor="#eef4ff" style="padding:16px 18px; background:#eef4ff; border:1px solid #9db7ff; border-radius:14px; box-shadow:${cardShadow}; color:#0f172a;">
                               <div style="font-size:13px; color:#4b5563; margin-bottom:4px;">Sposób płatności</div>
                               <div style="font-size:22px; font-weight:800;">${escapedPaymentSummary}</div>
                             </td>
