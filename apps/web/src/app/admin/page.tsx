@@ -164,7 +164,13 @@ export default function AdminPage() {
                 <main className="hero">
                     <section className="shell">
                         <div className="hero-inner">
-                            <h4 className="headline">
+                            <h4
+                                className="headline"
+                                style={{
+                                    fontSize: '1.8rem',
+                                    fontWeight: 400,
+                                }}
+                            >
                                 Zarządzanie <span className="accent">kursantami i umowami</span>
                             </h4>
 

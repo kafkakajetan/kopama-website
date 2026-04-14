@@ -162,6 +162,7 @@ export class AdminService {
         phone: true,
         status: true,
         wantsCashPayment: true,
+        wantsInstallments: true,
         courseCategory: {
           select: {
             name: true,
