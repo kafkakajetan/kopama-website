@@ -49,6 +49,70 @@ export class EnrollmentsService {
     private readonly courseStartSlotsService: CourseStartSlotsService,
   ) {}
 
+  private async generateDocumentsAndSendEmail(params: {
+    enrollment: EnrollmentWithCategory;
+    loginEmail?: string;
+    plainPassword?: string;
+  }) {
+    const { enrollment, loginEmail, plainPassword } = params;
+
+    const documents = await this.contractPdf.generateEnrollmentDocuments({
+      fileId: enrollment.id,
+      offerItemCode: enrollment.offerItem.code,
+      offerLanguage: enrollment.offerItem.language,
+      courseMode: enrollment.courseMode,
+      wantsInstallments: enrollment.wantsInstallments,
+      firstName: enrollment.firstName,
+      lastName: enrollment.lastName,
+      pesel: enrollment.pesel,
+      pkkNumber: enrollment.pkkNumber,
+      addressLine1: enrollment.addressLine1,
+      addressLine2: enrollment.addressLine2,
+      city: enrollment.city,
+      postalCode: enrollment.postalCode,
+      phone: enrollment.phone,
+      email: enrollment.email,
+      otherDrivingLicenseCategory: enrollment.otherDrivingLicenseCategory,
+      otherDrivingLicenseNumber: enrollment.otherDrivingLicenseNumber,
+      hasTramPermit: enrollment.hasTramPermit,
+      tramPermitNumber: enrollment.tramPermitNumber,
+    });
+
+    await this.prisma.contractDocument.upsert({
+      where: { enrollmentId: enrollment.id },
+      update: {
+        status: 'GENERATED',
+        storageKey: documents.contract.relativePath,
+        generatedAt: new Date(),
+        templateVer: 'v1',
+      },
+      create: {
+        enrollmentId: enrollment.id,
+        status: 'GENERATED',
+        storageKey: documents.contract.relativePath,
+        generatedAt: new Date(),
+        templateVer: 'v1',
+        fileHash: null,
+      },
+    });
+
+    const fullName = `${enrollment.firstName} ${enrollment.lastName}`;
+
+    try {
+      await this.mailService.sendContractEmail({
+        to: enrollment.email.trim().toLowerCase(),
+        fullName,
+        contractAbsolutePath: documents.contract.absolutePath,
+        rodoAbsolutePath: documents.rodo.absolutePath,
+        loginEmail,
+        plainPassword,
+        isMinor: enrollment.isMinorAtPurchase,
+      });
+    } catch (error: unknown) {
+      this.logger.error('Nie udało się wysłać maila z umową i RODO.', error);
+    }
+  }
+
   async create(
     dto: CreateEnrollmentDto,
     ip?: string,
@@ -345,6 +409,14 @@ export class EnrollmentsService {
       userCreated = true;
     }
 
+    if (dto.wantsCashPayment) {
+      await this.generateDocumentsAndSendEmail({
+        enrollment: createdEnrollment,
+        loginEmail: userCreated ? normalizedEmail : undefined,
+        plainPassword: userCreated ? tempPassword : undefined,
+      });
+    }
+
     return {
       ...createdEnrollment,
       userCreated,
@@ -405,61 +477,11 @@ export class EnrollmentsService {
       });
     }
 
-    const documents = await this.contractPdf.generateEnrollmentDocuments({
-      fileId: enrollment.id,
-      offerItemCode: enrollment.offerItem.code,
-      offerLanguage: enrollment.offerItem.language,
-      courseMode: enrollment.courseMode,
-      wantsInstallments: enrollment.wantsInstallments,
-      firstName: enrollment.firstName,
-      lastName: enrollment.lastName,
-      pesel: enrollment.pesel,
-      pkkNumber: enrollment.pkkNumber,
-      addressLine1: enrollment.addressLine1,
-      addressLine2: enrollment.addressLine2,
-      city: enrollment.city,
-      postalCode: enrollment.postalCode,
-      phone: enrollment.phone,
-      email: enrollment.email,
-      otherDrivingLicenseCategory: enrollment.otherDrivingLicenseCategory,
-      otherDrivingLicenseNumber: enrollment.otherDrivingLicenseNumber,
-      hasTramPermit: enrollment.hasTramPermit,
-      tramPermitNumber: enrollment.tramPermitNumber,
+    await this.generateDocumentsAndSendEmail({
+      enrollment: enrollment as EnrollmentWithCategory,
+      loginEmail: userCreated ? email : undefined,
+      plainPassword: userCreated ? tempPassword : undefined,
     });
-
-    await this.prisma.contractDocument.upsert({
-      where: { enrollmentId: enrollment.id },
-      update: {
-        status: 'GENERATED',
-        storageKey: documents.contract.relativePath,
-        generatedAt: new Date(),
-        templateVer: 'v1',
-      },
-      create: {
-        enrollmentId: enrollment.id,
-        status: 'GENERATED',
-        storageKey: documents.contract.relativePath,
-        generatedAt: new Date(),
-        templateVer: 'v1',
-        fileHash: null,
-      },
-    });
-
-    const fullName = `${enrollment.firstName} ${enrollment.lastName}`;
-
-    try {
-      await this.mailService.sendContractEmail({
-        to: email,
-        fullName,
-        contractAbsolutePath: documents.contract.absolutePath,
-        rodoAbsolutePath: documents.rodo.absolutePath,
-        loginEmail: userCreated ? email : undefined,
-        plainPassword: userCreated ? tempPassword : undefined,
-        isMinor: enrollment.isMinorAtPurchase,
-      });
-    } catch (error: unknown) {
-      this.logger.error('Nie udało się wysłać maila z umową i RODO.', error);
-    }
 
     return {
       ok: true,
