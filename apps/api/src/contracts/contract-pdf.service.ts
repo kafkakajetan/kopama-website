@@ -405,24 +405,24 @@ export class ContractPdfService {
       },
       drivingCategory: {
         pageIndex: 0,
-        x: 87,
-        y: 590.34,
+        x: 548,
+        y: 610.98,
         size: 10,
-        maxWidth: 70,
+        maxWidth: 42,
       },
       drivingNumber: {
         pageIndex: 0,
-        x: 252,
+        x: 92,
         y: 590.34,
         size: 10,
-        maxWidth: 170,
+        maxWidth: 95,
       },
       tramPermitNumber: {
         pageIndex: 0,
-        x: 252,
+        x: 430,
         y: 590.34,
         size: 10,
-        maxWidth: 170,
+        maxWidth: 120,
       },
     };
   }
