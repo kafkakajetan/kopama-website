@@ -145,29 +145,73 @@ export class MailService {
     const loginBlockText =
       params.loginEmail && params.plainPassword
         ? [
-            'Dane do logowania do panelu kursanta:',
-            `Email: ${params.loginEmail}`,
-            `Hasło: ${params.plainPassword}`,
+            'Dane logowania do Panelu Kursanta:',
+            `Login: ${params.loginEmail}`,
+            `Hasło tymczasowe: ${params.plainPassword}`,
+            'Po pierwszym logowaniu zalecamy zmianę hasła.',
           ].join('\n')
         : '';
 
     const loginBlockHtml =
       params.loginEmail && params.plainPassword
         ? `
-          <tr>
-            <td style="padding:0 0 20px 0;">
-              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" bgcolor="#ffffff" style="border-collapse:collapse; border:1px solid #d6d9e0; border-radius:14px; background:#ffffff; box-shadow:${cardShadow};">
-                <tr>
-                  <td style="padding:16px 18px; font-family:Arial, Helvetica, sans-serif; font-size:14px; line-height:21px; color:#1f2937;">
-                    <strong style="display:block; margin-bottom:8px;">Dane do logowania do panelu kursanta</strong>
-                    <div>Email: ${escapedLoginEmail}</div>
-                    <div>Hasło: ${escapedPassword}</div>
-                  </td>
-                </tr>
-              </table>
-            </td>
-          </tr>
-        `
+      <tr>
+        <td style="padding:0 0 20px 0;">
+          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" bgcolor="#ffffff" style="border-collapse:collapse; border:1px solid #d6d9e0; border-radius:14px; background:#ffffff; box-shadow:${cardShadow};">
+            <tr>
+              <td style="padding:18px 18px 8px 18px; font-family:Arial, Helvetica, sans-serif; font-size:14px; line-height:21px; color:#1f2937;">
+                <strong style="display:block; margin-bottom:6px; font-size:16px; color:#111827;">
+                  Dane logowania do Panelu Kursanta
+                </strong>
+                <div style="color:#4b5563; margin-bottom:14px;">
+                  Poniżej znajdują się dane dostępowe do Twojego konta.
+                </div>
+              </td>
+            </tr>
+
+            <tr>
+              <td style="padding:0 18px 12px 18px;">
+                <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" bgcolor="#f8fafc" style="border-collapse:collapse; border:1px solid #e5e7eb; border-radius:12px; background:#f8fafc;">
+                  <tr>
+                    <td style="padding:12px 14px; font-family:Arial, Helvetica, sans-serif;">
+                      <div style="font-size:12px; line-height:18px; color:#6b7280; margin-bottom:4px;">
+                        Login
+                      </div>
+                      <div style="font-size:15px; line-height:22px; color:#111827; font-weight:700;">
+                        ${escapedLoginEmail}
+                      </div>
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+
+            <tr>
+              <td style="padding:0 18px 12px 18px;">
+                <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" bgcolor="#f8fafc" style="border-collapse:collapse; border:1px solid #e5e7eb; border-radius:12px; background:#f8fafc;">
+                  <tr>
+                    <td style="padding:12px 14px; font-family:Arial, Helvetica, sans-serif;">
+                      <div style="font-size:12px; line-height:18px; color:#6b7280; margin-bottom:4px;">
+                        Hasło tymczasowe
+                      </div>
+                      <div style="font-size:16px; line-height:22px; color:#111827; font-weight:700; letter-spacing:.3px;">
+                        ${escapedPassword}
+                      </div>
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+
+            <tr>
+              <td style="padding:0 18px 18px 18px; font-family:Arial, Helvetica, sans-serif; font-size:13px; line-height:20px; color:#4b5563;">
+                Po pierwszym logowaniu zalecamy zmianę hasła w panelu kursanta.
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    `
         : '';
 
     const panelButtonHtml = `
