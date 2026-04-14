@@ -15,6 +15,14 @@ type SendContractEmailParams = {
   isMinor?: boolean;
 };
 
+type SendNewStudentNotificationEmailParams = {
+  fullName: string;
+  phone: string;
+  studentEmail: string;
+  courseName: string;
+  paymentSummary: string;
+};
+
 function escapeHtml(value: string): string {
   return value
     .replace(/&/g, '&amp;')
@@ -62,9 +70,7 @@ export class MailService {
     return nodemailer.createTransport(transportOptions);
   }
 
-  async sendContractEmail(params: SendContractEmailParams): Promise<void> {
-    const transporter = this.createTransporter();
-
+  private getSender() {
     const senderEmail =
       this.config.get<string>('BREVO_SENDER_EMAIL') ??
       this.config.get<string>('MAIL_FROM') ??
@@ -74,11 +80,30 @@ export class MailService {
     const senderName =
       this.config.get<string>('BREVO_SENDER_NAME') ?? 'OSK KopaMa';
 
-    const from = `"${senderName}" <${senderEmail}>`;
+    return {
+      senderEmail,
+      senderName,
+      from: `"${senderName}" <${senderEmail}>`,
+    };
+  }
+
+  private getPanelLoginUrl() {
+    const frontendUrl =
+      this.config.get<string>('FRONTEND_URL')?.trim() ||
+      'https://panelosk.cloud';
+
+    return `${frontendUrl.replace(/\/$/, '')}/logowanie`;
+  }
+
+  async sendContractEmail(params: SendContractEmailParams): Promise<void> {
+    const transporter = this.createTransporter();
+    const { from, senderName } = this.getSender();
 
     const profileZaufanyUrl =
       this.config.get<string>('PROFILE_ZAUFANY_URL') ??
       'https://www.gov.pl/web/gov/podpisz-dokument-elektronicznie-wykorzystaj-podpis-zaufany';
+
+    const panelLoginUrl = this.getPanelLoginUrl();
 
     const escapedFullName = escapeHtml(params.fullName);
     const escapedLoginEmail = params.loginEmail
@@ -99,7 +124,7 @@ export class MailService {
       ? `
         <tr>
           <td style="padding:0 0 20px 0;">
-            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="border-collapse:collapse; border:1px solid #dc2626; border-radius:14px; background:#fff5f5;">
+            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="border-collapse:collapse; border:1px solid #dc2626; border-radius:14px; background:#fff5f5; box-shadow:0 10px 24px rgba(15,23,42,.08);">
               <tr>
                 <td style="padding:16px 18px; font-family:Arial, Helvetica, sans-serif; font-size:14px; line-height:21px; color:#991b1b;">
                   <strong style="display:block; margin-bottom:8px;">Ważna informacja dla osoby niepełnoletniej</strong>
@@ -126,7 +151,7 @@ export class MailService {
         ? `
           <tr>
             <td style="padding:0 0 20px 0;">
-              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="border-collapse:collapse; border:1px solid #d6d9e0; border-radius:14px; background:#ffffff;">
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="border-collapse:collapse; border:1px solid #d6d9e0; border-radius:14px; background:#ffffff; box-shadow:0 10px 24px rgba(15,23,42,.08);">
                 <tr>
                   <td style="padding:16px 18px; font-family:Arial, Helvetica, sans-serif; font-size:14px; line-height:21px; color:#1f2937;">
                     <strong style="display:block; margin-bottom:8px;">Dane do logowania do panelu kursanta</strong>
@@ -140,6 +165,22 @@ export class MailService {
         `
         : '';
 
+    const panelButtonHtml = `
+      <tr>
+        <td style="padding:0 0 20px 0;">
+          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="border-collapse:collapse; border-radius:14px; background:#ffffff; box-shadow:0 10px 24px rgba(15,23,42,.08);">
+            <tr>
+              <td align="center" style="padding:20px 18px;">
+                <a href="${panelLoginUrl}" style="display:inline-block; background:#081f44; color:#ffffff; text-decoration:none; font-family:Arial, Helvetica, sans-serif; font-size:15px; font-weight:700; padding:14px 24px; border-radius:14px;">
+                  Zaloguj do Panelu Kursanta
+                </a>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    `;
+
     const textParts = [
       `Dzień dobry ${params.fullName},`,
       'w załączniku przesyłamy dokumenty do podpisu.',
@@ -150,6 +191,7 @@ export class MailService {
       'Dokumenty możesz podpisać elektronicznie przy użyciu Profilu Zaufanego:',
       profileZaufanyUrl,
       loginBlockText || null,
+      `Panel kursanta: ${panelLoginUrl}`,
       'Po podpisaniu dokumentów zachowaj je zgodnie z dalszymi instrukcjami szkoły.',
       'Pozdrawiamy,',
       senderName,
@@ -188,7 +230,7 @@ export class MailService {
             <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="border-collapse:collapse; background:#0b3bb3; margin:0; padding:0;">
               <tr>
                 <td align="center" style="padding:32px 16px;">
-                  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="border-collapse:collapse; max-width:680px; background:#f3f4f6; border-radius:24px; overflow:hidden;">
+                  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="border-collapse:collapse; max-width:680px; background:#f3f4f6; border-radius:24px; overflow:hidden; box-shadow:0 24px 60px rgba(0,0,0,.18);">
                     <tr>
                       <td style="padding:36px 32px 28px 32px; background:#0b3bb3; text-align:center;">
                         <div style="font-family:Arial, Helvetica, sans-serif; font-size:13px; line-height:20px; color:#ffffff; font-weight:700; margin-bottom:10px;">
@@ -218,7 +260,7 @@ export class MailService {
 
                           <tr>
                             <td style="padding:0 0 20px 0;">
-                              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="border-collapse:collapse; border:1px solid #d6d9e0; border-radius:14px; background:#ffffff;">
+                              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="border-collapse:collapse; border:1px solid #d6d9e0; border-radius:14px; background:#ffffff; box-shadow:0 10px 24px rgba(15,23,42,.08);">
                                 <tr>
                                   <td style="padding:16px 18px; font-family:Arial, Helvetica, sans-serif; font-size:14px; line-height:22px; color:#1f2937;">
                                     <strong style="display:block; margin-bottom:8px;">Załączniki</strong>
@@ -236,7 +278,7 @@ export class MailService {
 
                           <tr>
                             <td style="padding:0 0 20px 0;">
-                              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="border-collapse:collapse; border:1px solid #d6d9e0; border-radius:14px; background:#ffffff;">
+                              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="border-collapse:collapse; border:1px solid #d6d9e0; border-radius:14px; background:#ffffff; box-shadow:0 10px 24px rgba(15,23,42,.08);">
                                 <tr>
                                   <td style="padding:16px 18px; font-family:Arial, Helvetica, sans-serif; font-size:14px; line-height:22px; color:#1f2937;">
                                     <strong style="display:block; margin-bottom:8px;">Podpis elektroniczny</strong>
@@ -252,6 +294,7 @@ export class MailService {
                           </tr>
 
                           ${loginBlockHtml}
+                          ${panelButtonHtml}
 
                           <tr>
                             <td style="padding:0; font-family:Arial, Helvetica, sans-serif; font-size:14px; line-height:22px; color:#4b5563;">
@@ -273,6 +316,115 @@ export class MailService {
         </html>
       `,
       attachments,
+    };
+
+    await transporter.sendMail(mailOptions);
+  }
+
+  async sendNewStudentNotificationEmail(
+    params: SendNewStudentNotificationEmailParams,
+  ): Promise<void> {
+    const to = this.config.get<string>('NEW_STUDENT_NOTIFY_EMAIL')?.trim();
+    if (!to) return;
+
+    const transporter = this.createTransporter();
+    const { from, senderName } = this.getSender();
+
+    const escapedFullName = escapeHtml(params.fullName);
+    const escapedPhone = escapeHtml(params.phone);
+    const escapedStudentEmail = escapeHtml(params.studentEmail);
+    const escapedCourseName = escapeHtml(params.courseName);
+    const escapedPaymentSummary = escapeHtml(params.paymentSummary);
+
+    const text = [
+      'Nowy kursant w systemie.',
+      '',
+      `Imię i nazwisko: ${params.fullName}`,
+      `Telefon: ${params.phone}`,
+      `Email kursanta: ${params.studentEmail}`,
+      `Kurs: ${params.courseName}`,
+      `Sposób płatności: ${params.paymentSummary}`,
+    ].join('\n');
+
+    const mailOptions: SendMailOptions = {
+      from,
+      to,
+      subject: 'OSK KopaMa – nowy kursant',
+      text,
+      html: `
+        <!doctype html>
+        <html lang="pl">
+          <head>
+            <meta charset="utf-8" />
+            <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+            <title>OSK KopaMa – nowy kursant</title>
+          </head>
+          <body style="margin:0; padding:0; background:#0b3bb3;">
+            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="border-collapse:collapse; background:#0b3bb3;">
+              <tr>
+                <td align="center" style="padding:32px 16px;">
+                  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="border-collapse:collapse; max-width:680px; background:#f3f4f6; border-radius:24px; overflow:hidden; box-shadow:0 24px 60px rgba(0,0,0,.18);">
+                    <tr>
+                      <td style="padding:32px 28px; background:#0b3bb3; text-align:center;">
+                        <div style="font-family:Arial, Helvetica, sans-serif; font-size:13px; line-height:20px; color:#ffffff; font-weight:700; margin-bottom:10px;">
+                          Powiadomienie systemowe
+                        </div>
+                        <div style="font-family:Arial, Helvetica, sans-serif; font-size:32px; line-height:38px; color:#ffffff; font-weight:800; margin-bottom:8px;">
+                          Nowy kursant
+                        </div>
+                        <div style="font-family:Arial, Helvetica, sans-serif; font-size:16px; line-height:24px; color:#f4e3c3;">
+                          ${escapeHtml(senderName)}
+                        </div>
+                      </td>
+                    </tr>
+
+                    <tr>
+                      <td style="padding:28px;">
+                        <div style="font-family:Arial, Helvetica, sans-serif; font-size:15px; line-height:24px; color:#1f2937; margin-bottom:18px;">
+                          Do systemu został dodany nowy kursant. Najważniejsze dane:
+                        </div>
+
+                        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="border-collapse:separate; border-spacing:0 12px;">
+                          <tr>
+                            <td style="padding:16px 18px; background:#ffffff; border:1px solid #d6d9e0; border-radius:14px; box-shadow:0 10px 24px rgba(15,23,42,.08); font-family:Arial, Helvetica, sans-serif; color:#111827;">
+                              <div style="font-size:13px; color:#6b7280; margin-bottom:4px;">Imię i nazwisko</div>
+                              <div style="font-size:24px; font-weight:800;">${escapedFullName}</div>
+                            </td>
+                          </tr>
+                          <tr>
+                            <td style="padding:16px 18px; background:#ffffff; border:1px solid #d6d9e0; border-radius:14px; box-shadow:0 10px 24px rgba(15,23,42,.08); font-family:Arial, Helvetica, sans-serif; color:#111827;">
+                              <div style="font-size:13px; color:#6b7280; margin-bottom:4px;">Telefon</div>
+                              <div style="font-size:20px; font-weight:700;">${escapedPhone}</div>
+                            </td>
+                          </tr>
+                          <tr>
+                            <td style="padding:16px 18px; background:#ffffff; border:1px solid #d6d9e0; border-radius:14px; box-shadow:0 10px 24px rgba(15,23,42,.08); font-family:Arial, Helvetica, sans-serif; color:#111827;">
+                              <div style="font-size:13px; color:#6b7280; margin-bottom:4px;">Email kursanta</div>
+                              <div style="font-size:20px; font-weight:700;">${escapedStudentEmail}</div>
+                            </td>
+                          </tr>
+                          <tr>
+                            <td style="padding:16px 18px; background:#ffffff; border:1px solid #d6d9e0; border-radius:14px; box-shadow:0 10px 24px rgba(15,23,42,.08); font-family:Arial, Helvetica, sans-serif; color:#111827;">
+                              <div style="font-size:13px; color:#6b7280; margin-bottom:4px;">Kurs</div>
+                              <div style="font-size:20px; font-weight:700;">${escapedCourseName}</div>
+                            </td>
+                          </tr>
+                          <tr>
+                            <td style="padding:16px 18px; background:#eef4ff; border:1px solid #9db7ff; border-radius:14px; box-shadow:0 10px 24px rgba(15,23,42,.08); font-family:Arial, Helvetica, sans-serif; color:#0f172a;">
+                              <div style="font-size:13px; color:#4b5563; margin-bottom:4px;">Sposób płatności</div>
+                              <div style="font-size:22px; font-weight:800;">${escapedPaymentSummary}</div>
+                            </td>
+                          </tr>
+                        </table>
+                      </td>
+                    </tr>
+                  </table>
+                </td>
+              </tr>
+            </table>
+          </body>
+        </html>
+      `,
     };
 
     await transporter.sendMail(mailOptions);

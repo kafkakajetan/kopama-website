@@ -415,6 +415,14 @@ export class EnrollmentsService {
         loginEmail: userCreated ? normalizedEmail : undefined,
         plainPassword: userCreated ? tempPassword : undefined,
       });
+
+      await this.sendAdminNewStudentNotification({
+        fullName: `${createdEnrollment.firstName} ${createdEnrollment.lastName}`,
+        phone: createdEnrollment.phone,
+        studentEmail: createdEnrollment.email,
+        courseName: createdEnrollment.offerItem.name,
+        paymentSummary: 'gotówka',
+      });
     }
 
     return {
@@ -483,6 +491,16 @@ export class EnrollmentsService {
       plainPassword: userCreated ? tempPassword : undefined,
     });
 
+    await this.sendAdminNewStudentNotification({
+      fullName: `${enrollment.firstName} ${enrollment.lastName}`,
+      phone: enrollment.phone,
+      studentEmail: email,
+      courseName: enrollment.offerItem.name,
+      paymentSummary: enrollment.wantsInstallments
+        ? 'opłacona pierwsza rata'
+        : 'opłacony cały kurs',
+    });
+
     return {
       ok: true,
       enrollmentId,
@@ -490,6 +508,29 @@ export class EnrollmentsService {
       userCreated,
       tempPassword,
     };
+  }
+
+  private async sendAdminNewStudentNotification(params: {
+    fullName: string;
+    phone: string;
+    studentEmail: string;
+    courseName: string;
+    paymentSummary: string;
+  }) {
+    try {
+      await this.mailService.sendNewStudentNotificationEmail({
+        fullName: params.fullName,
+        phone: params.phone,
+        studentEmail: params.studentEmail,
+        courseName: params.courseName,
+        paymentSummary: params.paymentSummary,
+      });
+    } catch (error: unknown) {
+      this.logger.error(
+        'Nie udało się wysłać maila powiadamiającego o nowym kursancie.',
+        error,
+      );
+    }
   }
 
   async mockPay(enrollmentId: string): Promise<MockPayResult> {
