@@ -18,6 +18,7 @@ type Student = {
     phone: string | null;
     status: 'DRAFT' | 'PAYMENT_PENDING' | 'CASH_PENDING' | 'PAID' | 'CANCELED';
     wantsCashPayment: boolean;
+    wantsInstallments: boolean;
     courseCategory: {
         name: string;
     } | null;
@@ -197,7 +198,9 @@ export default function AdminStudentsPage() {
                                         }}
                                     >
                                         {student.status === 'PAID'
-                                            ? 'OPŁACONY'
+                                            ? student.wantsInstallments
+                                                ? '1 RATA'
+                                                : 'OPŁACONY'
                                             : student.status === 'CASH_PENDING'
                                                 ? 'GOTÓWKA'
                                                 : 'TRWA'}
