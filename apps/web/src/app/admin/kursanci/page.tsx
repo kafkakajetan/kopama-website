@@ -130,81 +130,136 @@ export default function AdminStudentsPage() {
         };
     }, [router]);
 
+    const thStyle: React.CSSProperties = {
+        textAlign: 'left',
+        padding: '10px 12px',
+        verticalAlign: 'top',
+        fontWeight: 700,
+        whiteSpace: 'nowrap',
+    };
+
+    const tdStyle: React.CSSProperties = {
+        padding: '14px 12px',
+        borderTop: '1px solid rgba(17,24,39,.08)',
+        verticalAlign: 'top',
+        lineHeight: 1.5,
+    };
+
     return (
         <div className="forms" style={{gridTemplateColumns: '1fr', gap: 24}}>
             <section className="formcard active">
                 <h2>Kursanci</h2>
                 <p>Liczba kont kursantów: {students.length}</p>
 
-                <div style={{overflowX: 'auto'}}>
-                    <table style={{width: '100%', borderCollapse: 'collapse'}}>
+                <div style={{ overflowX: 'auto' }}>
+                    <table
+                        style={{
+                            width: '100%',
+                            minWidth: 980,
+                            borderCollapse: 'separate',
+                            borderSpacing: 0,
+                            tableLayout: 'fixed',
+                        }}
+                    >
+                        <colgroup>
+                            <col style={{ width: '17%' }} />
+                            <col style={{ width: '11%' }} />
+                            <col style={{ width: '14%' }} />
+                            <col style={{ width: '18%' }} />
+                            <col style={{ width: '13%' }} />
+                            <col style={{ width: '18%' }} />
+                            <col style={{ width: '9%' }} />
+                        </colgroup>
+
                         <thead>
                         <tr>
-                            <th style={{textAlign: 'left', padding: '10px 8px'}}>Data</th>
-                            <th style={{textAlign: 'left', padding: '10px 8px'}}>Imię</th>
-                            <th style={{textAlign: 'left', padding: '10px 8px'}}>Nazwisko</th>
-                            <th style={{textAlign: 'left', padding: '10px 8px'}}>Kategoria kursu</th>
-                            <th style={{textAlign: 'left', padding: '10px 8px'}}>Telefon</th>
-                            <th style={{textAlign: 'left', padding: '10px 8px'}}>Mail</th>
-                            <th style={{textAlign: 'left', padding: '10px 8px'}}>Status płatności</th>
+                            <th style={thStyle}>Data</th>
+                            <th style={thStyle}>Imię</th>
+                            <th style={thStyle}>Nazwisko</th>
+                            <th style={thStyle}>Kategoria kursu</th>
+                            <th style={thStyle}>Telefon</th>
+                            <th style={thStyle}>Mail</th>
+                            <th style={thStyle}>Status płatności</th>
                         </tr>
                         </thead>
+
                         <tbody>
                         {students.map((student) => (
                             <tr key={student.id}>
-                                <td
-                                    style={{
-                                        padding: '10px 8px',
-                                        borderTop: '1px solid rgba(255,255,255,.12)',
-                                    }}
-                                >
+                                <td style={tdStyle}>
                                     {new Date(student.createdAt).toLocaleString('pl-PL')}
                                 </td>
-                                <td style={{padding: '10px 8px', borderTop: '1px solid rgba(255,255,255,.12)'}}>
+
+                                <td style={tdStyle}>
                                     {student.firstName}
                                 </td>
-                                <td style={{padding: '10px 8px', borderTop: '1px solid rgba(255,255,255,.12)'}}>
+
+                                <td style={tdStyle}>
                                     {student.lastName}
                                 </td>
-                                <td style={{padding: '10px 8px', borderTop: '1px solid rgba(255,255,255,.12)'}}>
+
+                                <td
+                                    style={{
+                                        ...tdStyle,
+                                        wordBreak: 'break-word',
+                                    }}
+                                >
                                     {student.courseCategory?.name ?? '—'}
                                 </td>
-                                <td style={{padding: '10px 8px', borderTop: '1px solid rgba(255,255,255,.12)'}}>
+
+                                <td
+                                    style={{
+                                        ...tdStyle,
+                                        whiteSpace: 'nowrap',
+                                    }}
+                                >
                                     {student.phone ?? '—'}
                                 </td>
-                                <td style={{padding: '10px 8px', borderTop: '1px solid rgba(255,255,255,.12)'}}>
+
+                                <td
+                                    style={{
+                                        ...tdStyle,
+                                        wordBreak: 'break-word',
+                                    }}
+                                >
                                     {student.email}
                                 </td>
-                                <td style={{padding: '10px 8px', borderTop: '1px solid rgba(255,255,255,.12)'}}>
-                                    <span
-                                        style={{
-                                            display: 'inline-block',
-                                            padding: '6px 10px',
-                                            borderRadius: 999,
-                                            fontWeight: 400,
-                                            fontSize: '12px',
-                                            color:
-                                                student.status === 'PAID'
-                                                    ? '#166534'
-                                                    : student.status === 'CASH_PENDING'
-                                                        ? '#b42318'
-                                                        : '#b54708',
-                                            background:
-                                                student.status === 'PAID'
-                                                    ? '#dcfce7'
-                                                    : student.status === 'CASH_PENDING'
-                                                        ? '#fee4e2'
-                                                        : '#ffedd5',
-                                        }}
-                                    >
-                                        {student.status === 'PAID'
-                                            ? student.wantsInstallments
-                                                ? '1 RATA'
-                                                : 'OPŁACONY'
-                                            : student.status === 'CASH_PENDING'
-                                                ? 'GOTÓWKA'
-                                                : 'TRWA'}
-                                    </span>
+
+                                <td
+                                    style={{
+                                        ...tdStyle,
+                                        whiteSpace: 'nowrap',
+                                    }}
+                                >
+                    <span
+                        style={{
+                            display: 'inline-block',
+                            padding: '6px 10px',
+                            borderRadius: 999,
+                            fontWeight: 400,
+                            fontSize: '12px',
+                            color:
+                                student.status === 'PAID'
+                                    ? '#166534'
+                                    : student.status === 'CASH_PENDING'
+                                        ? '#b42318'
+                                        : '#b54708',
+                            background:
+                                student.status === 'PAID'
+                                    ? '#dcfce7'
+                                    : student.status === 'CASH_PENDING'
+                                        ? '#fee4e2'
+                                        : '#ffedd5',
+                        }}
+                    >
+                        {student.status === 'PAID'
+                            ? student.wantsInstallments
+                                ? '1 RATA'
+                                : 'OPŁACONY'
+                            : student.status === 'CASH_PENDING'
+                                ? 'GOTÓWKA'
+                                : 'TRWA'}
+                    </span>
                                 </td>
                             </tr>
                         ))}
@@ -214,8 +269,8 @@ export default function AdminStudentsPage() {
                                 <td
                                     colSpan={7}
                                     style={{
-                                        padding: '12px 8px',
-                                        borderTop: '1px solid rgba(255,255,255,.12)',
+                                        ...tdStyle,
+                                        textAlign: 'left',
                                     }}
                                 >
                                     Brak kursantów.
